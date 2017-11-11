@@ -27,11 +27,13 @@
 
 namespace mcp2515 {
 
-/* Maximum clock frequency of the SPI on MCP2515 */
+/*============================================================================
+ * Maximum clock frequency of the SPI on MCP2515
+ */
 static const uint32_t SPI_CLOCK       = 10000000;
 
-/*
-* MCP2515 crystal frequencies. Internal clock frequency is the crytsal
+/*============================================================================
+ * MCP2515 crystal frequencies. Internal clock frequency is the crytsal
  * frequency divided by 2
  */
 static const uint32_t CRYSTAL_16MHZ   = 16000000;
@@ -42,10 +44,18 @@ static const uint32_t CRYSTAL_MIN     = 1000000;
 /*============================================================================
  * Configuration registers
  *----------------------------------------------------------------------------
- * CNF1 – CONFIGURATION 1 (ADDRESS: 2Ah)
+ * CNF1 – CONFIGURATION 1 (ADDRESS: 2Ah).See page 44 of the datasheet
  */
 static const uint8_t CNF1             = 0x2A;
 
+/*
+ *      7      6      5      4      3      2      1      0
+ *    R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0
+ *	+------+------+------+------+------+------+------+------+
+ *  | SJW1 | SJW0 | BRP5 | BRP4 | BRP3 | BRP2 | BRP1 | BRP0 |
+ *  +------+------+------+------+------+------+------+------+
+ */
+ 
 /*
  * SJW<1:0>: Synchronization Jump Width Length bits
  * 11 : Length = 4xTQ
@@ -63,10 +73,18 @@ static const uint8_t CNF1_SJW_MASK    = 0x03; /* shift then mask */
 static const uint8_t CNF1_BRP_MASK    = 0x3F;
 
 /*----------------------------------------------------------------------------
- * CNF2 – CONFIGURATION 2 (ADDRESS: 29h)
+ * CNF2 – CONFIGURATION 2 (ADDRESS: 29h).See page 44 of the datasheet
  */
 static const uint8_t CNF2             = 0x29;
 
+/*
+ *       7       6       5         4         3         2        1        0
+ *     R/W-0   R/W-0   R/W-0     R/W-0     R/W-0     R/W-0    R/W-0    R/W-0  
+ *	+---------+-----+---------+---------+---------+--------+--------+--------+
+ *  | BTLMODE | SAM | PHSEG12 | PHSEG11 | PHSEG10 | PRSEG2 | PRSEG1 | PRSEG0 |
+ *  +---------+-----+---------+---------+---------+--------+--------+--------+
+ */
+ 
 /*
  * BTLMODE: PS2 Bit Time Length bit (bit 7)
  * 1 : Length of PS2 determined by PHSEG22:PHSEG20 bits of CNF3
@@ -95,10 +113,18 @@ static const uint8_t CNF2_PHSEG1_MASK  = 0x07; /* shift then mask */
 static const uint8_t CNF2_PRSEG_MASK   = 0x07;
 
 /*----------------------------------------------------------------------------
- * CNF3 – CONFIGURATION 3 (ADDRESS: 28h)
+ * CNF3 – CONFIGURATION 3 (ADDRESS: 28h).See page 45 of the datasheet
  */
 static const uint8_t CNF3             = 0x28;
 
+/*
+ *     7       6      5     4     3       2         1         0
+ *   R/W-0   R/W-0   U-0   U-0   U-0    R/W-0     R/W-0     R/W-0  
+ *	+-----+--------+-----+-----+-----+---------+---------+---------+
+ *  | SOF | WAKFIL |  -  |  -  |  -  | PHSEG22 | PHSEG21 | PHSEG20 |
+ *  +-----+--------+-----+-----+-----+---------+---------+---------+
+ */
+ 
 /*
  * SOF: Start-of-Frame signal bit (bit 7)
  * If CANCTRL.CLKEN = 1:
@@ -125,20 +151,28 @@ static const uint8_t CNF3_PHSEG2_MASK = 0x07;
 /*============================================================================
  * Error handling registers
  *----------------------------------------------------------------------------
- * TEC - TRANSMIT ERROR COUNTER (ADDRESS: 1Ch)
+ * TEC - TRANSMIT ERROR COUNTER (ADDRESS: 1Ch). See page 49 of the datasheet
  */
 static const uint8_t TEC               = 0x1C;
 
 /*----------------------------------------------------------------------------
- * REC - RECEIVER ERROR COUNTER (ADDRESS: 1Dh)
+ * REC - RECEIVER ERROR COUNTER (ADDRESS: 1Dh). See page 49 of the datasheet
  */
 static const uint8_t REC               = 0x1D;
 
 /*----------------------------------------------------------------------------
- * EFLG – ERROR FLAG (ADDRESS: 2Dh)
+ * EFLG – ERROR FLAG (ADDRESS: 2Dh). See page 50 of the datasheet
  */
 static const uint8_t EFLG              = 0x2D;
 
+/*
+ *       7        6       5      4      3      2       1       0
+ *     R/W-0   R/W-0     R-0    R-0    R-0    R-0     R-0     R-0  
+ *	+--------+--------+------+------+------+-------+-------+-------+
+ *  | RX1OVR | RX0OVR | TXB0 | TXEP | RXEP | TXWAR | RXWAR | EWARN |
+ *	+--------+--------+------+------+------+-------+-------+-------+
+ */
+ 
 /*
  * RX1OVR: Receive Buffer 1 Overflow Flag bit (bit 7)
  * - Set when a valid message is received for RXB1 and CANINTF.RX1IF = 1
@@ -198,10 +232,18 @@ static const uint8_t EFLG_EWARN        = 1 << 0;
 /*============================================================================
  * Interrupts related registers
  *----------------------------------------------------------------------------
- * CANINTE – INTERRUPT ENABLE (ADDRESS: 2Bh)
+ * CANINTE – INTERRUPT ENABLE (ADDRESS: 2Bh). See page 53 of the datasheet
  */
 static const uint8_t CANINTE           = 0x2B;
 
+/*
+ *      7       6       5       4       3       2       1       0
+ *    R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0
+ *	+-------+-------+-------+-------+-------+-------+-------+-------+
+ *  | MERRE | WAKIE | ERRIE | TX2IE | TX1IE | TX0IE | RX1IE | RX0IE |
+ *	+-------+-------+-------+-------+-------+-------+-------+-------+
+ */
+ 
 /*
  * MERRE: Message Error Interrupt Enable bit (bit 7)
  * 1 : Interrupt on error during message reception or transmission
@@ -260,9 +302,17 @@ static const uint8_t CANINTE_RX1IE     = 1 << 1;
 static const uint8_t CANINTE_RX0IE     = 1 << 0;
 
 /*----------------------------------------------------------------------------
- * CANINTF – INTERRUPT FLAG (ADDRESS: 2Ch)
+ * CANINTF – INTERRUPT FLAG (ADDRESS: 2Ch). See page 54 of the datasheet
  */
 static const uint8_t CANINTF           = 0x2C;
+
+/*
+ *      7       6       5       4       3       2       1       0
+ *    R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0
+ *	+-------+-------+-------+-------+-------+-------+-------+-------+
+ *  | MERRF | WAKIF | ERRIF | TX2IF | TX1IF | TX0IF | RX1IF | RX0IF |
+ *	+-------+-------+-------+-------+-------+-------+-------+-------+
+ */
 
 /*
  * MERRF: Message Error Interrupt Flag bit (bit 7)
@@ -323,9 +373,17 @@ static const uint8_t CANINTF_RX0IF     = 1 << 0;
 /*============================================================================
  * Control and status registers
  *----------------------------------------------------------------------------
- * CANCTRL – CAN CONTROL REGISTER (ADDRESS: XFh)
+ * CANCTRL – CAN CONTROL REGISTER (ADDRESS: XFh). See page 60 of the datasheet
  */
 static const uint8_t CANCTRL           = 0x0F;
+
+/*
+ *       7        6        5       4     3      2        1         0
+ *     R/W-1    R/W-0    R/W-0  R/W-0  R/W-0  R/W-1    R/W-1     R/W-1
+ *	+--------+--------+--------+------+-----+-------+---------+---------+
+ *  | REQOP2 | REQOP1 | REQOP0 | ABAT | OSM | CLKEN | CLKPRE1 | CLKPRE0 |
+ *	+--------+--------+--------+------+-----+-------+---------+---------+
+ */
 
 /*
  * REQOP<2:0>: Request Operation mode bits (bits 7 to 5)
@@ -336,6 +394,13 @@ static const uint8_t CANCTRL           = 0x0F;
  * 100 : Set configuration mode
  * All other values for REQOP bits are invalid and should not be used
  * On power-up, REQOP : b’111’
+ *
+ * NOTE: the REQOP value of 111 at Power Up contradicts the reset value of the
+ * register as shown in the datasheet (100) aka Configuration Mode.
+ * When reading this register, the value is indeed 100. So the datasheet claim
+ * (On power-up, REQOP : b’111’), an invalid value by the way, is false or
+ * the silicon has been updated to fit the reset value of the datasheet and the
+ * claim is obsolet.
  */
 static const uint8_t CANCTRL_REQOP_SHIFT = 5;
 static const uint8_t CANCTRL_REQOP_MASK  = 0x07;
@@ -380,10 +445,18 @@ static const uint8_t CLKOUTDIV4          = 2;
 static const uint8_t CLKOUTDIV8          = 3;
 
 /*----------------------------------------------------------------------------
- * CANSTAT – CAN STATUS REGISTER (ADDRESS: XEh)
+ * CANSTAT – CAN STATUS REGISTER (ADDRESS: XEh). See page 61 of the datasheet
  */
 static const uint8_t CANSTAT             = 0x0E;
 
+/*
+ *       7         6         5      4     3       2       1     0
+ *      R-1       R-0       R-0    U-0   R-0     R-0     R-0   U-0  
+ *	+---------+---------+---------+---+-------+-------+-------+---+
+ *  | OPMODE2 | OPMODE1 | OPMODE0 | - | ICOD2 | ICOD1 | ICOD0 | - |
+ *	+---------+---------+---------+---+-------+-------+-------+---+
+ */
+ 
 /*
  * OPMOD<2:0>: Operation mode bits (bits 7 to 5)
  * 000 : Device is in the Normal Operation mode
@@ -435,6 +508,16 @@ static const uint8_t TXB1CTRL            = 0x40;
 static const uint8_t TXB2CTRL            = 0x50;
 
 /*
+ * See page 18 of the datasheet
+ *
+ *    7     6      5      4       3     2     1      0
+ *   U-0   R-0    R-0    R-0    R/W-0  U-0  R/W-0  R/W-0  
+ *	+---+------+------+-------+-------+---+------+------+
+ *  | - | ABTF | MLOA | TXERR | TXREQ | - | TXP1 | TXP0 |
+ *	+---+------+------+-------+-------+---+------+------+
+ */
+
+/*
  * ABTF: Message Aborted Flag bit (bit 6)
  * 1 : Message was aborted
  * 0 : Message completed transmission successfully
@@ -475,9 +558,18 @@ static const uint8_t TXBnCTRL_TXREQ      = 1 << 3;
 static const uint8_t TXBnCTRL_TXP_MASK   = 0x03;
 
 /*----------------------------------------------------------------------------
- * TXRTSCTRL – TXnRTS PIN CONTROL AND STATUS REGISTER (ADDRESS: 0Dh)
+ * TXRTSCTRL – TXnRTS PIN CONTROL AND STATUS REGISTER (ADDRESS: 0Dh).
+ * See page 19 of the datasheet
  */
 static const uint8_t TXRTSCTRL           = 0x0D;
+
+/*
+ *    7   6     5       4       3        2        1        0
+ *   U-0 U-0   R-x     R-x     R-x     R/W-0    R/W-0    R/W-0  
+ *	+---+---+-------+-------+-------+--------+--------+--------+
+ *  | - | - | B2RTS | B1RTS | B0RTS | B2RTSM | B1RTSM | B0RTSM |
+ *	+---+---+-------+-------+-------+--------+--------+--------+
+ */
 
 /*
  * B2RTS: TX2RTS Pin State bit (bit 5)
@@ -539,6 +631,16 @@ static const uint8_t TXB1SIDH            = 0x41;
  */
 static const uint8_t TXB2SIDH            = 0x51;
 
+/*
+ * See page 20 of the datasheet
+ *
+ *      7       6      5      4      3      2      1      0
+ *    R/W-x   R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x 
+ *	+-------+------+------+------+------+------+------+------+
+ *  | SID10 | SID9 | SID8 | SID7 | SID6 | SID5 | SID4 | SID3 |
+ *	+-------+------+------+------+------+------+------+------+
+ */
+
 /*----------------------------------------------------------------------------
  * TXB0SIDL – TRANSMIT BUFFER 0 STANDARD IDENTIFIER LOW (ADDRESS: 32h)
  */
@@ -553,6 +655,16 @@ static const uint8_t TXB1SIDL            = 0x42;
  * TXB2SIDL – TRANSMIT BUFFER 2 STANDARD IDENTIFIER LOW (ADDRESS: 52h)
  */
 static const uint8_t TXB2SIDL            = 0x52;
+
+/*
+ * See page 20 of the datasheet
+ *
+ *      7      6      5     4      3      2      1       0
+ *    R/W-x  R/W-x  R/W-x R/W-x  R/W-x  R/W-x  R/W-x   R/W-x 
+ *	+------+------+------+-----+-------+-----+-------+-------+
+ *  | SID2 | SID1 | SID0 |  -  | EXIDE |  -  | EID17 | EID16 |
+ *	+------+------+------+-----+-------+-----+-------+-------+
+ */
 
 /*
  * SID<2:0>: Standard Identifier bits (bits 7 to 5)
@@ -587,6 +699,16 @@ static const uint8_t TXB1EID8            = 0x43;
  */
 static const uint8_t TXB2EID8            = 0x53;
 
+/*
+ * See page 21 of the datasheet
+ *
+ *      7       6       5       4       3       2       1      0
+ *    R/W-x   R/W-x   R/W-x   R/W-x   R/W-x   R/W-x   R/W-x  R/W-x 
+ *	+-------+-------+-------+-------+-------+-------+------+------+
+ *  | EID15 | EID14 | EID13 | EID12 | EID11 | EID10 | EID9 | EID8 |
+ *	+-------+-------+-------+-------+-------+-------+------+------+
+ */
+
 /*----------------------------------------------------------------------------
  * TXB0EID0 – TRANSMIT BUFFER 0 EXTENDED IDENTIFIER LOW (ADDRESS: 34h)
  */
@@ -601,6 +723,16 @@ static const uint8_t TXB1EID0            = 0x44;
  * TXB2EID0 – TRANSMIT BUFFER 2 EXTENDED IDENTIFIER LOW (ADDRESS: 54h)
  */
 static const uint8_t TXB2EID0            = 0x54;
+
+/*
+ * See page 21 of the datasheet
+ *
+ *      7      6      5      4      3      2      1      0
+ *    R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x 
+ *	+------+------+------+------+------+------+------+------+
+ *  | EID7 | EID6 | EID5 | EID4 | EID3 | EID2 | EID1 | EID0 |
+ *	+------+------+------+------+------+------+------+------+
+ */
 
 /*----------------------------------------------------------------------------
  * TXB0DLC - TRANSMIT BUFFER 0 DATA LENGTH CODE (ADDRESS: 35h)
@@ -618,6 +750,16 @@ static const uint8_t TXB1DLC             = 0x45;
 static const uint8_t TXB2DLC             = 0x55;
 
 /*
+ * See page 22 of the datasheet
+ *
+ *     7     6     5     4      3      2      1      0
+ *   R/W-x R/W-x R/W-x R/W-x  R/W-x  R/W-x  R/W-x  R/W-x 
+ *	+-----+-----+-----+-----+------+------+------+------+
+ *  |  -  | RTR |  -  |  -  | DLC3 | DLC2 | DLC1 | DLC0 |
+ *	+-----+-----+-----+-----+------+------+------+------+
+ */
+
+/*
  * RTR: Remote Transmission Request bit (bit 6)
  * 1 : Transmitted Message will be a Remote Transmit Request
  * 0 : Transmitted Message will be a Data Frame
@@ -626,14 +768,14 @@ static const uint8_t TXBnDLC_RTR         = 1 << 6;
 
 /*
  * DLC<3:0>: Data Length Code bits (bit 3 to 0)
- * Sets the number of data uint8_ts to be transmitted (0 to 8 uint8_ts)
+ * Sets the number of data bytes to be transmitted (0 to 8 bytes)
  * Note: It is possible to set the DLC to a value greater than eight,
- * however only eight uint8_ts are transmitted
+ * however only eight bytes are transmitted
  */
 static const uint8_t TXBnDLC_DLC_MASK    = 0x0F;
 
 /*----------------------------------------------------------------------------
- * TXB0Dm – TRANSMIT BUFFER 0 DATA uint8_t m (ADDRESS: 36h to 3Dh)
+ * TXB0Dm – TRANSMIT BUFFER 0 DATA byte m (ADDRESS: 36h to 3Dh)
  */
 static const uint8_t TXB0D0           = 0x36;
 static const uint8_t TXB0D1           = 0x37;
@@ -645,7 +787,7 @@ static const uint8_t TXB0D6           = 0x3C;
 static const uint8_t TXB0D7           = 0x3D;
 
 /*----------------------------------------------------------------------------
- * TXB1Dm – TRANSMIT BUFFER 0 DATA uint8_t m (ADDRESS: 46h to 4Dh)
+ * TXB1Dm – TRANSMIT BUFFER 0 DATA byte m (ADDRESS: 46h to 4Dh)
  */
 static const uint8_t TXB1D0           = 0x46;
 static const uint8_t TXB1D1           = 0x47;
@@ -657,7 +799,7 @@ static const uint8_t TXB1D6           = 0x4C;
 static const uint8_t TXB1D7           = 0x4D;
 
 /*----------------------------------------------------------------------------
- * TXB2Dm – TRANSMIT BUFFER 0 DATA uint8_t m (ADDRESS: 56h to 5Dh)
+ * TXB2Dm – TRANSMIT BUFFER 0 DATA byte m (ADDRESS: 56h to 5Dh)
  */
 static const uint8_t TXB2D0           = 0x56;
 static const uint8_t TXB2D1           = 0x57;
@@ -671,9 +813,18 @@ static const uint8_t TXB2D7           = 0x5D;
 /*============================================================================
  * Registers related to messages reception
  *----------------------------------------------------------------------------
- * RXB2CTRL – RECEIVE BUFFER 0 CONTROL (ADDRESS: 60h)
+ * RXB0CTRL – RECEIVE BUFFER 0 CONTROL (ADDRESS: 60h).
+ * See page 27 of the datasheet
  */
 static const uint8_t RXB0CTRL         = 0x60;
+
+/*
+ *     7      6      5     4      3       2      1        0
+ *    U-0   R/W-0  R/W-0  U-0    R-0    R/W-0   R-0      R-0 
+ *	+-----+------+------+-----+-------+------+-------+---------+
+ *  |  -  | RXM1 | RXM0 |  -  | RXRTR | BUKT | BUKT1 | FILHIT0 |
+ *	+-----+------+------+-----+-------+------+-------+---------+
+ */
 
 /*
  * RXM<1:0>: Receive Buffer Operating mode bits (bits 6 and 5)
@@ -685,7 +836,7 @@ static const uint8_t RXB0CTRL         = 0x60;
  *      for the messages with standard IDs.
  * 00 : Receive all valid messages using either standard or extended
  *      identifiers that meet filter criteria. Extended ID filter registers
- *      RXFnEID8:RXFnEID0 are applied to first two uint8_ts of data in the
+ *      RXFnEID8:RXFnEID0 are applied to first two bytes of data in the
  *      messages with standard IDs.
  */
 static const uint8_t RXB0CTRL_RXM1    = 1 << 6;
@@ -721,9 +872,18 @@ static const uint8_t RXB0CTRL_BUKT1   = 1 << 1;
 static const uint8_t RXB0CTRL_FILHIT0 = 1 << 0;
 
 /*----------------------------------------------------------------------------
- * RXB1CTRL – RECEIVE BUFFER 1 CONTROL (ADDRESS: 70h)
+ * RXB1CTRL – RECEIVE BUFFER 1 CONTROL (ADDRESS: 70h).
+ * See page 28 of the datasheet
  */
 static const uint8_t RXB1CTRL         = 0x70;
+
+/*
+ *     7      6      5     4      3        2         1         0
+ *    U-0   R/W-0  R/W-0  U-0    R-0      R-0       R-0       R-0 
+ *	+-----+------+------+-----+-------+---------+---------+---------+
+ *  |  -  | RXM1 | RXM0 |  -  | RXRTR | FILHIT2 | FILHIT1 | FILHIT0 |
+ *	+-----+------+------+-----+-------+---------+---------+---------+
+ */
 
 /*
  * RXM<1:0>: Receive Buffer Operating mode bits (bits 6 and 5)
@@ -735,7 +895,7 @@ static const uint8_t RXB1CTRL         = 0x70;
  *      for the messages with standard IDs.
  * 00 : Receive all valid messages using either standard or extended
  *      identifiers that meet filter criteria. Extended ID filter registers
- *      RXFnEID8:RXFnEID0 are applied to first two uint8_ts of data in the
+ *      RXFnEID8:RXFnEID0 are applied to first two bytes of data in the
  *      messages with standard IDs.
  */
 static const uint8_t RXB1CTRL_RXM1    = 1 << 6;
@@ -764,8 +924,17 @@ static const uint8_t RXB1CTRL_FILHIT0 = 1 << 0;
 
 /*----------------------------------------------------------------------------
  * BFPCTRL – RXnBF PIN CONTROL AND STATUS (ADDRESS: 0Ch)
+ * See page 29 of the datasheet
  */
 static const uint8_t BFPCTRL          = 0x0C;
+
+/*
+ *     7     6      5       4       3       2       1       0
+ *    U-0   U-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0 
+ *	+-----+-----+-------+-------+-------+-------+-------+-------+
+ *  |  -  |  -  | B1BFS | B0BFS | B1BFE | B0BFE | B1BFM | B0BFM |
+ *	+-----+-----+-------+-------+-------+-------+-------+-------+
+ */
 
 /*
  * B1BFS: RX1BF Pin State bit (Digital Output mode only) (bit 5)
@@ -821,6 +990,16 @@ static const uint8_t RXB0SIDH         = 0x61;
  */
 static const uint8_t RXB1SIDH         = 0x71;
 
+/*
+ * See page 30 of the datasheet
+ *
+ *      7       6      5      4      3      2      1      0
+ *     R-x     R-x    R-x    R-x    R-x    R-x    R-x    R-x  
+ *	+-------+------+------+------+------+------+------+------+
+ *  | SID10 | SID9 | SID8 | SID7 | SID6 | SID5 | SID4 | SID3 |
+ *	+-------+------+------+------+------+------+------+------+
+ */
+
 /*----------------------------------------------------------------------------
  * RXB0SIDL – RECEIVE BUFFER 0 STANDARD IDENTIFIER LOW (ADDRESS: 62h)
  */
@@ -830,6 +1009,16 @@ static const uint8_t RXB0SIDL         = 0x62;
  * RXB1SIDL – RECEIVE BUFFER 1 STANDARD IDENTIFIER LOW (ADDRESS: 72h)
  */
 static const uint8_t RXB1SIDL         = 0x72;
+
+/*
+ * See page 30 of the datasheet
+ *
+ *      7      6      5     4     3     2      1       0
+ *     R-x    R-x    R-x   R-x   R-x   U-0    R-x     R-x  
+ *	+------+------+------+-----+-----+-----+-------+-------+
+ *  | SID2 | SID1 | SID0 | SRR | IDE |  -  | EID17 | EID16 |
+ *	+------+------+------+-----+-----+-----+-------+-------+
+ */
 
 /*
  * SID<2:0>: Standard Identifier bits (bits 7 to 5)
@@ -879,6 +1068,16 @@ static const uint8_t RXB0EID8         = 0x63;
  */
 static const uint8_t RXB1EID8         = 0x73;
 
+/*
+ * See page 31 of the datasheet
+ *
+ *      7       6       5       4       3       2       1      0
+ *     R-x     R-x     R-x     R-x     R-x     R-x     R-x    R-x 
+ *	+-------+-------+-------+-------+-------+-------+------+------+
+ *  | EID15 | EID14 | EID13 | EID12 | EID11 | EID10 | EID9 | EID8 |
+ *	+-------+-------+-------+-------+-------+-------+------+------+
+ */
+
 /*----------------------------------------------------------------------------
  * RXB0EID0 – RECEIVE BUFFER 0 EXTENDED IDENTIFIER LOW (ADDRESS: 63h)
  * EID<7:0>: Extended Identifier bits
@@ -895,6 +1094,16 @@ static const uint8_t RXB0EID0         = 0x64;
  */
 static const uint8_t RXB1EID0         = 0x74;
 
+/*
+ * See page 31 of the datasheet
+ *
+ *      7      6      5      4      3      2      1      0
+ *     R-x    R-x    R-x    R-x    R-x    R-x    R-x    R-x
+ *  +------+------+------+------+------+------+------+------+
+ *  | EID7 | EID6 | EID5 | EID4 | EID3 | EID2 | EID1 | EID0 |
+ *	+------+------+------+------+------+------+------+------+
+ */
+
 /*----------------------------------------------------------------------------
  * RXB0DLC - RECEIVE BUFFER 0 DATA LENGTH CODE (ADDRESS: 65h)
  */
@@ -906,6 +1115,18 @@ static const uint8_t RXB0DLC          = 0x65;
 static const uint8_t RXB1DLC          = 0x75;
 
 /*
+ * See page 32 of the datasheet
+ *
+ *     7     6     5     4      3      2      1      0
+ *    R-x   R-x   R-x   R-x    R-x    R-x    R-x    R-x
+ *  +-----+-----+-----+-----+------+------+------+------+
+ *  |  -  | RTR | RB1 | RB0 | DLC3 | DLC2 | DLC1 | DLC0 |
+ *  +-----+-----+-----+-----+------+------+------+------+
+ *
+ * RB1 and RB0 are reserved
+ */
+
+/*
  * RTR: Extended Frame Remote Transmission Request bit (bit 6)
  * (valid only when RXB1SIDL.IDE = 1)
  * 1 : Extended Frame Remote Transmit Request Received
@@ -915,12 +1136,12 @@ static const uint8_t RXBnDLC_RTR      = 1 << 6;
 
 /*
  * DLC<3:0>: Data Length Code bits (bit 3 to 0)
- * Indicates number of data uint8_ts that were received
+ * Indicates number of data bytes that were received
  */
 static const uint8_t RXBnDLC_DLC_MASK = 0x07;
 
 /*----------------------------------------------------------------------------
- * RXB0Dm - RECEIVE BUFFER 0 DATA uint8_t m (ADDRESS: 66h to 6Dh)
+ * RXB0Dm - RECEIVE BUFFER 0 DATA byte m (ADDRESS: 66h to 6Dh)
  */
 static const uint8_t RXB0D0           = 0x66;
 static const uint8_t RXB0D1           = 0x67;
@@ -932,7 +1153,7 @@ static const uint8_t RXB0D6           = 0x6C;
 static const uint8_t RXB0D7           = 0x6D;
 
 /*----------------------------------------------------------------------------
- * RXB1Dm - RECEIVE BUFFER 1 DATA uint8_t m (ADDRESS: 76h to 7Dh)
+ * RXB1Dm - RECEIVE BUFFER 1 DATA byte m (ADDRESS: 76h to 7Dh)
  */
 static const uint8_t RXB1D0           = 0x76;
 static const uint8_t RXB1D1           = 0x77;
@@ -954,6 +1175,16 @@ static const uint8_t RXF3SIDH         = 0x10;
 static const uint8_t RXF4SIDH         = 0x14;
 static const uint8_t RXF5SIDH         = 0x18;
 
+/*
+ * See page 35 of the datasheet
+ *
+ *      7       6      5      4      3      2      1      0
+ *    R/W-x   R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  
+ *	+-------+------+------+------+------+------+------+------+
+ *  | SID10 | SID9 | SID8 | SID7 | SID6 | SID5 | SID4 | SID3 |
+ *	+-------+------+------+------+------+------+------+------+
+ */
+
 /*----------------------------------------------------------------------------
  * RXFnSIDL – FILTER n STANDARD IDENTIFIER LOW
  * (ADDRESS: 01h, 05h, 09h, 11h, 15h, 19h)
@@ -964,6 +1195,16 @@ static const uint8_t RXF2SIDL         = 0x09;
 static const uint8_t RXF3SIDL         = 0x11;
 static const uint8_t RXF4SIDL         = 0x15;
 static const uint8_t RXF5SIDL         = 0x19;
+
+/*
+ * See page 35 of the datasheet
+ *
+ *      7      6      5     4      3      2      1       0
+ *    R/W-x  R/W-x  R/W-x  U-0   R/W-x   U-0   R/W-x   R/W-x 
+ *	+------+------+------+-----+-------+-----+-------+-------+
+ *  | SID2 | SID1 | SID0 |  -  | EXIDE |  -  | EID17 | EID16 |
+ *	+------+------+------+-----+-------+-----+-------+-------+
+ */
 
 /*
  * SID<2:0>: Standard Identifier Filter bits (bits 7 to 5)
@@ -998,6 +1239,16 @@ static const uint8_t RXF3EID8            = 0x12;
 static const uint8_t RXF4EID8            = 0x16;
 static const uint8_t RXF5EID8            = 0x1A;
 
+/*
+ * See page 36 of the datasheet
+ *
+ *      7       6       5       4       3       2       1      0
+ *    R/W-x   R/W-x   R/W-x   R/W-x   R/W-x   R/W-x   R/W-x  R/W-x  
+ *	+-------+-------+-------+-------+-------+-------+------+------+
+ *  | EID15 | EID14 | EID13 | EID12 | EID11 | EID10 | EID9 | EID8 |
+ *	+-------+-------+-------+-------+-------+-------+------+------+
+ */
+
 /*----------------------------------------------------------------------------
  * RXFnEID0 – FILTER n EXTENDED IDENTIFIER LOW
  * (ADDRESS: 03h, 07h, 0Bh, 13h, 17h, 1Bh)
@@ -1009,11 +1260,31 @@ static const uint8_t RXF3EID0            = 0x13;
 static const uint8_t RXF4EID0            = 0x17;
 static const uint8_t RXF5EID0            = 0x1B;
 
+/*
+ * See page 36 of the datasheet
+ *
+ *      7      6      5      4      3      2      1      0
+ *    R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x
+ *  +------+------+------+------+------+------+------+------+
+ *  | EID7 | EID6 | EID5 | EID4 | EID3 | EID2 | EID1 | EID0 |
+ *	+------+------+------+------+------+------+------+------+
+ */
+
 /*----------------------------------------------------------------------------
  * RXMnSIDH – MASK n STANDARD IDENTIFIER HIGH (ADDRESS: 20h, 24h)
  */
 static const uint8_t RXM0SIDH            = 0x20;
 static const uint8_t RXM1SIDH            = 0x24;
+
+/*
+ * See page 37 of the datasheet
+ *
+ *      7       6      5      4      3      2      1      0
+ *    R/W-0   R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  
+ *	+-------+------+------+------+------+------+------+------+
+ *  | SID10 | SID9 | SID8 | SID7 | SID6 | SID5 | SID4 | SID3 |
+ *	+-------+------+------+------+------+------+------+------+
+ */
 
 /*----------------------------------------------------------------------------
  * RXMnSIDL – MASK n STANDARD IDENTIFIER LOW (ADDRESS: 21h, 25h)
@@ -1021,11 +1292,31 @@ static const uint8_t RXM1SIDH            = 0x24;
 static const uint8_t RXM0SIDL            = 0x21;
 static const uint8_t RXM1SIDL            = 0x25;
 
+/*
+ * See page 37 of the datasheet
+ *
+ *      7      6      5     4     3     2      1       0
+ *    R/W-0  R/W-0  R/W-0  U-0   U-0   U-0   R/W-0   R/W-0 
+ *	+------+------+------+-----+-----+-----+-------+-------+
+ *  | SID2 | SID1 | SID0 |  -  |  -  |  -  | EID17 | EID16 |
+ *	+------+------+------+-----+-----+-----+-------+-------+
+ */
+
 /*----------------------------------------------------------------------------
  * RXMnEID8 – MASK n EXTENDED IDENTIFIER HIGH (ADDRESS: 22h, 26h)
  */
 static const uint8_t RXM0EID8            = 0x22;
 static const uint8_t RXM1EID8            = 0x26;
+
+/*
+ * See page 38 of the datasheet
+ *
+ *      7       6       5       4       3       2       1      0
+ *    R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0  R/W-0 
+ *	+-------+-------+-------+-------+-------+-------+------+------+
+ *  | EID15 | EID14 | EID13 | EID12 | EID11 | EID10 | EID9 | EID8 |
+ *	+-------+-------+-------+-------+-------+-------+------+------+
+ */
 
 /*----------------------------------------------------------------------------
  * RXMnEID0 – MASK n EXTENDED IDENTIFIER LOW (ADDRESS: 23h, 27h)
@@ -1033,8 +1324,18 @@ static const uint8_t RXM1EID8            = 0x26;
 static const uint8_t RXM0EID0            = 0x23;
 static const uint8_t RXM1EID0            = 0x27;
 
+/*
+ * See page 38 of the datasheet
+ *
+ *      7      6      5      4      3      2      1      0
+ *    R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0 
+ *  +------+------+------+------+------+------+------+------+
+ *  | EID7 | EID6 | EID5 | EID4 | EID3 | EID2 | EID1 | EID0 |
+ *	+------+------+------+------+------+------+------+------+
+ */
+
 /*============================================================================
- * MCP2515 SPI Insctructions
+ * MCP2515 SPI Insctructions. See page 67 of the datasheet
  *----------------------------------------------------------------------------
  * RESET instruction
  */
