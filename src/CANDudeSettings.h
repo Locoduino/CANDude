@@ -40,37 +40,70 @@ class CANDudeSettings
                            const uint32_t inWishedBaudRate,
                            const uint32_t inMaxPPMError = 600);
 
-  private : uint32_t mWishedBaudRate;   // asked baud rate in byte/s
-  private : uint32_t mCANCrystal; // MCP2515 crystal frequency
-  private : bool mConfigOk; // true is the computed configuration is doable
-  private : uint8_t mBRP;   // 0..63, actual value of Baud Rate Prescaler is mBRP+1
-  private : uint8_t mPS;    // 0..7, actual value of Propagation Segment is mPS+1
-  private : uint8_t mPS1;   // 0..7, actual value of Phase Segment 1 is mPS1+1
-  private : uint8_t mPS2;   // 1..7, actual value of Phase Segment 2 is mPS2+1
-  private : uint8_t mSJW;   // 0..3, actual value of Sync Jump Width is mSJW+1
-  private : uint8_t mSendQueueSize;    // size of sending queue in bytes
-  private : uint8_t mReceiveQueueSize; // size of receiving queue in bytes
-
-  public : uint32_t baudRate() const { return mBaudRate; }
+  /*
+   * Wished baud rate in byte/s as specified in the constructor
+   */
+  private : uint32_t mWishedBaudRate;
+  public : uint32_t baudRate() const { return mWishedBaudRate; }
+  
+  /*
+   * Frequency in Hertz of the MCP2515 crystal
+   */
+  private : uint32_t mCANCrystal;
   public : uint32_t CANCrystal() const { return mCANCrystal; }
+  
+  /*
+   * At start mConfigOk is set to false. If the configuration is doable
+   * it is set to true
+   */
+  private : bool mConfigOk;
+  
+  /*
+   * Baud Rate Prescaler. Ranges from 0 to 63. Actual Value is mBRP+1
+   */
+  private : uint8_t mBRP;
   public : uint8_t brp() const { return mBRP; }
+  
+  /*
+   * Propagation Segment. Ranges from 0 to 7. Actual value is mPS + 1
+   */
+  private : uint8_t mPS;
   public : uint8_t ps() const { return mPS; }
+  
+  /*
+   * Phase Segment 1. Ranges from 0 to 7. Actual value is mPS1 + 1
+   */
+  private : uint8_t mPS1;
   public : uint8_t ps1() const { return mPS1; }
+  
+  /*
+   * Phase Segment 2. Ranges from 1 to 7. Actual value is mPS2 + 1
+   */
+  private : uint8_t mPS2;
   public : uint8_t ps2() const { return mPS2; }
+  
+  /*
+   * Sync Jump Width. Ranges from 0 to 3. Actual value is mSJW + 1
+   */
+  private : uint8_t mSJW;  
   public : uint8_t sjw() const { return mSJW; }
+  
+  
   public : uint32_t actualBaudRate() const;
+
   public : bool configOk() const { return mConfigOk; }
+
   public : uint32_t absoluteError() const { return actualBaudRate() - mBaudRate; }
+
   public : uint16_t samplePoint() const;
+
   public : uint32_t PPMError() const;
+
   public : uint8_t timeQuantaCount()const;
+
   public : bool tripleSampling() const { return timeQuantaCount() > 15; }
+
   public : void print() const;
-  // Size of receive and send queues
-  public : uint8_t sendQueueSize() const { return mSendQueueSize; }
-  public : uint8_t receiveQueueSize() const { return mReceiveQueueSize; }
-  public : void setSendQueueSize(const uint8_t inSize) { mSendQueueSize = inSize > 250 ? 250 : inSize; }
-  public : void setReceiveQueueSize(const uint8_t inSize) { mReceiveQueueSize = inSize > 250 ? 250 : inSize; }
 };
 
 #endif
