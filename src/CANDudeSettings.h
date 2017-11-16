@@ -57,6 +57,7 @@ class CANDudeSettings
    * it is set to true
    */
   private : bool mConfigOk;
+  public : bool configOk() const { return mConfigOk; }
   
   /*
    * Baud Rate Prescaler. Ranges from 0 to 63. Actual Value is mBRP+1
@@ -88,21 +89,42 @@ class CANDudeSettings
   private : uint8_t mSJW;  
   public : uint8_t sjw() const { return mSJW; }
   
-  
+  /*
+   * actualBaudRate computes the actual baud rate of the configuration that
+   * may be different from the wished baudrate if the latter is no possible
+   */
   public : uint32_t actualBaudRate() const;
 
-  public : bool configOk() const { return mConfigOk; }
+  /*
+   * absoluteError returns the difference between the actual baud rate and the
+   * wished baud rate.
+   */
+  public : int32_t absoluteError() const { return actualBaudRate() - mWishedBaudRate; }
 
-  public : uint32_t absoluteError() const { return actualBaudRate() - mBaudRate; }
-
+  /*
+   * samplePoint returns the position of the sample point multiplied by 1000
+   */
   public : uint16_t samplePoint() const;
 
+  /*
+   * PPMError returns the relative baud rate error expressed in parts per million
+   */
   public : uint32_t PPMError() const;
 
+  /*
+   * timeQuantaCount returns the number of time quantum (TQ) in a bit
+   */
   public : uint8_t timeQuantaCount()const;
 
+  /*
+   * tripleSampling returns true if triple sampling is used in the computed
+   * configuration
+   */
   public : bool tripleSampling() const { return timeQuantaCount() > 15; }
 
+  /*
+   * print the configuration for debug purpose
+   */
   public : void print() const;
 };
 
