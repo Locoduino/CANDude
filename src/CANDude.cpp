@@ -23,175 +23,7 @@
 #include <SPI.h>
 #include <CANDude.h>
 #include <HardwareSerial.h>
-
-/*============================================================================
- * CANDudeSettings class handle a setting of the CAN bus
- *----------------------------------------------------------------------------
- * Constructor. Does computation of bit timing
- */
-CANDudeSettings::CANDudeSettings(const uint32_t inCANCrystal,
-                                 const uint32_t inBaudRate,
-                                 const uint32_t inMaxPPMError) :
-mConfigOk(false),
-mBaudRate(inBaudRate),
-mCANCrystal(inCANCrystal),
-mSendQueueSize(16),
-mReceiveQueueSize(0)
-{
-  /* out of range crytal frequency according to MCP2515 datasheet */
-  if (inCANCrystal < mcp2515::CRYSTAL_MIN ||
-      inCANCrystal > mcp2515::CRYSTAL_MAX) return;
-
-  /* CAN clock is half of crystal frequency */
-  uint32_t CANClock = inCANCrystal / 2;
-
-  uint32_t TQCount = 25; 			// TQCount ranges from 5 to 25
-  uint32_t smallestError = UINT32_MAX;
-  uint32_t bestBRP = 64;			// settings for slowest baud rate	
-  uint32_t bestTQCount = 25;	// settings for slowest baud rate	
-  uint32_t BRP = CANClock / inBaudRate / TQCount;
-  
-  /* Find the best BRP and best TQCount fitting the inBaudRate */
-  while ((TQCount >= 5) && (BRP <= 64)) {
-  	/* Compute error with BRP */
-  	if (BRP > 0) {
-  		/* error is always > = 0 */
-  		const uint32_t error = (CANClock / TQCount / BRP) - inBaudRate;
-  		if (error < smallestError) {
-  			smallestError = error;
-  			bestBRP = BRP;
-  			bestTQCount = TQCount;
-  		}
-  	}
-  	/* Compute error with BRP + 1 */
-  	if (BRP < 64) {
-  		/* error is always > = 0 */
-  		const uint32_t error = inBaudRate - (CANClock / TQCount / (BRP + 1));
-  		if (error < smallestError) {
-  			smallestError = error;
-  			bestBRP = BRP + 1;
-  			bestTQCount = TQCount;
-  		}
-  	}
-  	/* Continue with the next value of TQCount and BRP */
-  	TQCount--;
-  	BRP = CANClock / inBaudRate / TQCount;
-  } 
-
-	// Set the BRP
-	mBRP = bestBRP - 1; /* mBRP is the value that will be stored in 2515 */
-	// Compute PS2 so that it is lower or equal to 40% of TQCount
-	uint8_t PS2 = (7 * bestTQCount) / 20;
-	if (PS2 < 2) PS2 = 2;
-	mPS2 = PS2 - 1;
-	// Compute the remaining number of TQ once PS2 and SyncSeg are removed
-	bestTQCount -= PS2 + 1;
-	// Set PS1 to half of remaining TQCount
-	uint8_t PS1 = bestTQCount / 2;
-	if (PS1 < 1) PS1 = 1;
-	mPS1 = PS1 - 1;
-	// Set PS to what is left
-	uint8_t PS = bestTQCount - PS1;
-	mPS = PS - 1;
-	// Set SJW to PS2 minus 1
-	mSJW = mPS2 < 4 ? mPS2 - 1 : 3;
-
-	// Adjust the sample point.
-	if (samplePoint() > 700) {
-		mPS2++;
-		if (mPS1 > 0) mPS1--;
-		else if (mPS > 0) mPS--;
-		else mPS2--; // unable tu reduce mPS1 or mPS2, so we stay with a sample point greater than 70%
-	}
-	if (samplePoint() < 600 && mPS2 > 1) {
-		mPS2--;
-		mPS1++;
-	}
-
-	// Final check of the configuration
-	mConfigOk = (PS > 0) && (PPMError() <= inMaxPPMError);
-}
-
-/*----------------------------------------------------------------------------
- * Prints a CANDudeSettings
- */
-static void printSequence(
-  const char delimiter,
-  const char fill,
-  const uint8_t * const segs,
-  const uint8_t count)
-{
-  Serial.print(delimiter);
-  for (uint8_t seg = 0 ; seg < count ; seg++) {
-    for (uint8_t i = 0 ; i < segs[seg]; i++) Serial.print(fill);
-    Serial.print(delimiter);
-  }
-}
-
-static void printlnSequence(
-  const char delimiter,
-  const char fill,
-  const uint8_t * const segs,
-  const uint8_t count)
-{
-  printSequence(delimiter, fill, segs, count);
-  Serial.println();
-}
-
-void CANDudeSettings::print() const
-{
-  uint8_t segTable[] = { 1, mPS + 1, mPS1 + 1, mPS2 + 1 };
-  printlnSequence('+', '-', segTable , 4);
-  printSequence('|', ' ', segTable , 4);
-	Serial.print(" Baud="); Serial.print(mBaudRate);
-	Serial.print(" BRP="); Serial.print(mBRP+1);
-	Serial.print(" TQCount="); Serial.print(timeQuantaCount());
-	Serial.print(" SamplePoint="); Serial.print(samplePoint());
-	Serial.print(" error="); Serial.print(absoluteError());
-	Serial.print(" PPM="); Serial.println(PPMError());
-  printlnSequence('+', '-', segTable , 4);
-}
-
-/*----------------------------------------------------------------------------
- * Returns the number of Time Quanta in a bit
- */
-uint8_t CANDudeSettings::timeQuantaCount() const
-{
-  return 1 /* SyncSeg */ + (mPS + 1) + (mPS1 + 1) + (mPS2 + 1);
-}
-
-/*----------------------------------------------------------------------------
- * Returns the number of Time Quanta in a bit
- */
-uint32_t CANDudeSettings::actualBaudRate() const
-{
-	uint8_t TQCount = timeQuantaCount();
-  return TQCount > 0 ? (mCANCrystal / 2) / (TQCount * (mBRP + 1)) : 0;
-}
-
-/*----------------------------------------------------------------------------
- * Returns the ppm error of a configuration
- */
- uint32_t CANDudeSettings::PPMError() const
- {
-   uint32_t adjustedError = absoluteError();
-   uint32_t multiplier = 1;
-   while (adjustedError > 4294) {
-     adjustedError /= 10;
-     multiplier *= 10;
-   }
-   return ((1000000 * adjustedError) / mBaudRate) * multiplier;
- }
-
-/*----------------------------------------------------------------------------
- * Returns the sample point in ‰
- */
-uint16_t CANDudeSettings::samplePoint() const
-{
-	uint16_t divisor = timeQuantaCount();
-	uint16_t phaseSeg2 = mPS2 + 1;
-	return divisor > 0 ? (1000 * (divisor - phaseSeg2)) / divisor : 0;
-}
+#include <CANDudeSettings.h>
 
 /*============================================================================
  * CANDudeMessage is the class to handle both sent and receive messages
@@ -199,44 +31,44 @@ uint16_t CANDudeSettings::samplePoint() const
  */
 void CANDudeSendMessage::setStandardId(const uint16_t inId)
 {
-	sidh = (inId >> 3) & 0x00FF;
-	sidl = ((inId & mcp2515::TXBnSIDL_SID_MASK) << mcp2515::TXBnSIDL_SID_SHIFT);
+  sidh = (inId >> 3) & 0x00FF;
+  sidl = ((inId & mcp2515::TXBnSIDL_SID_MASK) << mcp2515::TXBnSIDL_SID_SHIFT);
 }
 
 /*----------------------------------------------------------------------------
  */
 void CANDudeSendMessage::setExtendedId(const uint32_t inId)
 {
-	sidh = (inId >> 3) & 0x000000FF;
-	sidl = ((inId & mcp2515::TXBnSIDL_SID_MASK) << mcp2515::TXBnSIDL_SID_SHIFT) |
-	       mcp2515::TXBnSIDL_EXIDE |
+  sidh = (inId >> 3) & 0x000000FF;
+  sidl = ((inId & mcp2515::TXBnSIDL_SID_MASK) << mcp2515::TXBnSIDL_SID_SHIFT) |
+         mcp2515::TXBnSIDL_EXIDE |
          ((inId >> 27) & mcp2515::TXBnSIDL_EID_MASK);
-	eid8 = (inId >> 19) & 0x000000FF;
-	eid0 = (inId >> 11) & 0x000000FF;
+  eid8 = (inId >> 19) & 0x000000FF;
+  eid0 = (inId >> 11) & 0x000000FF;
 }
 
 /*----------------------------------------------------------------------------
  */
 void CANDudeSendMessage::setRemote(const bool inRemote)
 {
-	if (inRemote) dlc |= mcp2515::TXBnDLC_RTR;
-	else dlc &= ~mcp2515::TXBnDLC_RTR;
+  if (inRemote) dlc |= mcp2515::TXBnDLC_RTR;
+  else dlc &= ~mcp2515::TXBnDLC_RTR;
 }
 
 /*----------------------------------------------------------------------------
  */
 void CANDudeSendMessage::setLength(const uint8_t inLength)
 {
-	dlc &= ~mcp2515::TXBnDLC_DLC_MASK;
-	dlc |= inLength & mcp2515::TXBnDLC_DLC_MASK;
+  dlc &= ~mcp2515::TXBnDLC_DLC_MASK;
+  dlc |= inLength & mcp2515::TXBnDLC_DLC_MASK;
 }
 
 /*----------------------------------------------------------------------------
  */
 uint8_t CANDudeSendMessage::sizeInBytes() const
 {
-	// 4 bytes for id and one for length + the number of bytes
-	return 5 + length();
+  // 4 bytes for id and one for length + the number of bytes
+  return 5 + length();
 }
 
 /*----------------------------------------------------------------------------
@@ -300,14 +132,14 @@ CANDudeQueue::CANDudeQueue(const uint8_t inSize) :
 mSize(0),
 mIndex(0)
 {
-	uint8_t mask = 0xFF;
-	uint8_t size = inSize > 16 ? inSize - 1 : 15;
-	while (!(size & 0x80)) {
-		mask >>= 1;
-		size <<= 1;
-	}
+  uint8_t mask = 0xFF;
+  uint8_t size = inSize > 16 ? inSize - 1 : 15;
+  while (!(size & 0x80)) {
+    mask >>= 1;
+    size <<= 1;
+  }
   mMask = mask;
-	mQueue = new uint8_t[((uint16_t)mask) + 1];
+  mQueue = new uint8_t[((uint16_t)mask) + 1];
 }
 
 /*----------------------------------------------------------------------------
@@ -315,12 +147,12 @@ mIndex(0)
  */
 uint8_t CANDudeQueue::pushByte(const uint8_t inByte)
 {
-	if (!isFull()) {
-		mQueue[mIndex++] = inByte;
-		mSize++;
-		mIndex &= mMask;
+  if (!isFull()) {
+    mQueue[mIndex++] = inByte;
+    mSize++;
+    mIndex &= mMask;
     return 1;
-	}
+  }
   else {
     return 0;
   }
@@ -338,7 +170,7 @@ uint8_t CANDudeQueue::pushByte(const uint8_t * const inBytes, const uint8_t inCo
     mQueue[mIndex++] = inBytes[i];
     mIndex &= mMask;
   }
-	mSize += howMany;
+  mSize += howMany;
   return howMany;
 }
 
@@ -347,7 +179,7 @@ uint8_t CANDudeQueue::pushByte(const uint8_t * const inBytes, const uint8_t inCo
  */
 uint8_t CANDudeQueue::popByte()
 {
-	if (mSize > 0) {
+  if (mSize > 0) {
     uint8_t readIndex = (mIndex - mSize) & mMask;
     mSize--;
     return mQueue[readIndex];
@@ -375,15 +207,15 @@ uint8_t CANDudeQueue::popByte(uint8_t * const outBytes, const uint8_t inCount)
  */
 void CANDudeQueue::print() const
 {
-	uint8_t readIndex = (mIndex - mSize) & mMask;
-	uint8_t size = mSize;
-	Serial.print('['); Serial.print(mSize); Serial.print("] ");
-	while (size-- > 0) {
-		Serial.print(mQueue[readIndex++], HEX);
-		Serial.print(' ');
-		readIndex &= mMask;
-	}
-	Serial.println();
+  uint8_t readIndex = (mIndex - mSize) & mMask;
+  uint8_t size = mSize;
+  Serial.print('['); Serial.print(mSize); Serial.print("] ");
+  while (size-- > 0) {
+    Serial.print(mQueue[readIndex++], HEX);
+    Serial.print(' ');
+    readIndex &= mMask;
+  }
+  Serial.println();
 }
 /*============================================================================
  */
@@ -404,8 +236,8 @@ static const SPISettings kMcp2515Settings(10000000, MSBFIRST, SPI_MODE0);
  * Constructor. Set the chip select pin
  */
 CANDude::CANDude(const uint8_t inSlaveSelectPin,
-								 const uint8_t inInterruptPin,
-								 const CANDudeInterrupt inInterruptFunction) :
+                 const uint8_t inInterruptPin,
+                 const CANDudeInterrupt inInterruptFunction) :
 mSlaveSelectPin(inSlaveSelectPin),
 mInterruptPin(inInterruptPin),
 mInterruptFunction(inInterruptFunction),
@@ -537,7 +369,7 @@ void CANDude::loadMessage(
   const CANDudeSendMessage &inMessage)
 {
   uint8_t numberOfBytes = inMessage.sizeInBytes();
-  uint8_t *dataPtr = inMessage.start();
+  const uint8_t *dataPtr = inMessage.start();
   Serial.print("S: ");
   Serial.print(mcp2515::LOAD_TX_BUFFER(inBufferID), BIN);
   for (uint8_t i = 0; i < numberOfBytes; i++) {
@@ -618,13 +450,13 @@ void CANDude::modifyBit(
 CANDudeResult CANDude::setMode(const uint8_t inMode)
 {
   if (inMode <= mcp2515::CONFIG_MODE) {
-    // Set CANCTRL.REQOP to request a new mode of operation
+    //---- Set CANCTRL.REQOP to request a new mode of operation
     modifyBit(
       mcp2515::CANCTRL,
       mcp2515::CANCTRL_REQOP_MASK << mcp2515::CANCTRL_REQOP_SHIFT,
       inMode << mcp2515::CANCTRL_REQOP_SHIFT
     );
-    // Loop until CANSTAT.OPMOD get the same value or 1 ms elapsed
+    //---- Loop until CANSTAT.OPMOD get the same value or 1 ms elapsed
     uint8_t opmod;
     uint32_t currentTime = micros();
     do {
@@ -647,48 +479,38 @@ CANDudeResult CANDude::setMode(const uint8_t inMode)
  */
 CANDudeResult CANDude::begin(const CANDudeSettings & inSettings)
 {
-	// Allocate the send and receive queues if any
-	if (inSettings.receiveQueueSize() > 0) {
-		mReceiveQueue = new CANDudeQueue(inSettings.receiveQueueSize());
-		if (mReceiveQueue == NULL || mReceiveQueue->allocFailed()) return CANDudeOutOfMemory;
-	}
-	if (inSettings.sendQueueSize() > 0) {
-		mSendQueue = new CANDudeQueue(inSettings.sendQueueSize());
-		if (mSendQueue == NULL || mSendQueue->allocFailed()) return CANDudeOutOfMemory;
-	}
-
   unselect(); // Turn off the chip select before programming the pin as output
   pinMode(mSlaveSelectPin, OUTPUT); // Program the chip select as output
   SPI.begin();
-  // reset the MCP2515
+  //---- reset the MCP2515
   reset();
-  // Test the communication with the MCP2515 by writing and reading data
-  // to and from byte 0 of TX buffer 0
+  //---- Test the communication with the MCP2515 by writing and reading data
+  //---- to and from byte 0 of TX buffer 0
   write(mcp2515::TXB0D0, 0xAA);
   if (read(mcp2515::TXB0D0) != 0xAA) return CANDudeSPIFailed;
   write(mcp2515::TXB0D0, 0x55);
   if (read(mcp2515::TXB0D0) != 0x55) return CANDudeSPIFailed;
 
-  // Check settings to avoid configuration if settings are not ok
+  //---- Check settings to avoid configuration if settings are not ok
   if (! inSettings.configOk()) return CANDudeBadConfig;
 
-  // Enter config mode
+  //---- Enter config mode
   CANDudeResult result = setMode(mcp2515::CONFIG_MODE);
   if (result == CANDudeOk) {
-    // Program bit timing according to the configuration
+    //---- Program bit timing according to the configuration
     uint8_t cnf[3];
-    // CNF register ar stored in consecutive registers from CNF3 to CNF1
-    // that is address in reverse order compared to register number
+    //---- CNF register ar stored in consecutive registers from CNF3 to CNF1
+    //---- that is address in reverse order compared to register number
     cnf[2] = // This is CNF1
       (inSettings.sjw() << mcp2515::CNF1_SJW_SHIFT) | // SJW
-      inSettings.brp();                             // BRP
+      inSettings.brp();                               // BRP
     cnf[1] = // This is CNF2
       mcp2515::CNF2_BTLMODE | // PS2 is in CNF3
-      (inSettings.tripleSampling() ? mcp2515::CNF2_SAM : 0) | // Triple sample point is set only when there is enough TQ
+      (inSettings.tripleSampling() ? mcp2515::CNF2_SAM : 0) |
       (inSettings.ps1() << mcp2515::CNF2_PHSEG1_SHIFT) | // PS1
-      inSettings.ps();                                 // PS
+      inSettings.ps();                                   // PS
     cnf[0] = // This is CNF3
-      inSettings.ps2();                                // PS2
+      inSettings.ps2();                                  // PS2
 
     for (uint8_t i=0; i < 3; i++) {
       Serial.print("CNF");
@@ -699,16 +521,16 @@ CANDudeResult CANDude::begin(const CANDudeSettings & inSettings)
     }
     Serial.println();
 
-    // Write the bit timing configuration
+    //---- Write the bit timing configuration
     write(mcp2515::CNF3, 3 /* 3 registers */, cnf);
 
-		// Program Interrupts
-		pinMode(mInterruptPin, INPUT);
-		uint8_t interruptNumber = digitalPinToInterrupt(mInterruptPin);
-		SPI.usingInterrupt(interruptNumber);
-		attachInterrupt(interruptNumber, mInterruptFunction, FALLING);
-		// Enable RXB0 and TXB0 Interrupts
-		write(mcp2515::CANINTE, mcp2515::CANINTE_TX0IE, mcp2515::CANINTE_RX0IE);
+    //---- Program Interrupts
+    pinMode(mInterruptPin, INPUT);
+    uint8_t interruptNumber = digitalPinToInterrupt(mInterruptPin);
+    SPI.usingInterrupt(interruptNumber);
+    attachInterrupt(interruptNumber, mInterruptFunction, FALLING);
+    //---- Enable RXB0 and TXB0 Interrupts
+    write(mcp2515::CANINTE, mcp2515::CANINTE_TX0IE | mcp2515::CANINTE_RX0IE);
 
     // Go back to normal mode
     result = setMode(mcp2515::NORMAL_MODE);
@@ -722,14 +544,14 @@ CANDudeResult CANDude::begin(const CANDudeSettings & inSettings)
 CANDudeResult CANDude::sendMessage(const CANDudeSendMessage & inMessage)
 {
   if (mSendCount > 0) {
-  	if (mSendQueue->available() >= inMessage.sizeInBytes()) {
-  		mSendQueue->pushByte(inMessage.start(), 5);
+    if (mSendQueue->available() >= inMessage.sizeInBytes()) {
+      mSendQueue->pushByte(inMessage.start(), 5);
       mSendQueue->pushByte(inMessage.dataPart(), inMessage.length());
-  		return CANDudeOk;
-  	}
-  	else {
-  		return CANDudeNoRoom;
-  	}
+      return CANDudeOk;
+    }
+    else {
+      return CANDudeNoRoom;
+    }
   }
   else {
     loadMessage(0, inMessage);

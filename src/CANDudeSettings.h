@@ -32,6 +32,8 @@
  * object. The constructor takes at least 2 arguments:
  * 1) the crystal frequency of the MCP2515
  * 2) the wished baudrate of the CAN bus
+ * 3) the optional maximum PPM to accept a configuration. 600 is the default
+ *    value
  * From that, a configuration of the bit timing is done
  */
 class CANDudeSettings
@@ -90,6 +92,12 @@ class CANDudeSettings
   public : uint8_t sjw() const { return mSJW; }
   
   /*
+   * Triple sampling
+   */
+  private : bool mTripleSampling;
+  public : bool tripleSampling() const { return mTripleSampling; }
+  
+  /*
    * actualBaudRate computes the actual baud rate of the configuration that
    * may be different from the wished baudrate if the latter is no possible
    */
@@ -99,7 +107,9 @@ class CANDudeSettings
    * absoluteError returns the difference between the actual baud rate and the
    * wished baud rate.
    */
-  public : int32_t absoluteError() const { return actualBaudRate() - mWishedBaudRate; }
+  public : int32_t absoluteError() const {
+    return actualBaudRate() - mWishedBaudRate;
+  }
 
   /*
    * samplePoint returns the position of the sample point multiplied by 1000
@@ -115,12 +125,6 @@ class CANDudeSettings
    * timeQuantaCount returns the number of time quantum (TQ) in a bit
    */
   public : uint8_t timeQuantaCount()const;
-
-  /*
-   * tripleSampling returns true if triple sampling is used in the computed
-   * configuration
-   */
-  public : bool tripleSampling() const { return timeQuantaCount() > 15; }
 
   /*
    * print the configuration for debug purpose
