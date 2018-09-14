@@ -26,8 +26,8 @@
 #include <Arduino.h>
 #include <MCP2515Definitions.h>
 
-/*-----------------------------------------------------------------------------
- * CANDudeSettings class handle a setting of the CAN bus
+/*=================================================================================================
+ * CANDudeSettings class handles a setting of the CAN bus
  *
  * Initialization of CANDude starts with the instantiation of a CANDudeSettings
  * object. The constructor takes at least 2 arguments:
@@ -106,6 +106,9 @@ public:
   public : void print() const;
 };
 
+/*=================================================================================================
+ * CANDudeFilters class handles the filters and the masks
+ */
 class CANDudeFilters {
 
 private:
@@ -119,16 +122,21 @@ private:
   uint32_t mBuffer1Mask;
   Filter_t mBuffer1Filter[4];
 
-  uint8_t byteInMaskOrFilter(const uint32_t inMaskOrFilter, const maskOrFilterPos inPos, const uint8_t defaultResult);
-
 public:
   enum maskOrFilterPos { SIDH = 0, SIDL = 1, EID8 = 2, EID0 = 3 };
   CANDudeFilters();
   bool setMask(const uint8_t inBuffer, const uint32_t inMask);
-  bool setFilter(const uint8_t inBuffer, const uint8_t inFilter, const bool inIsExtended, const uint32_t inFilter);
+  bool setFilter(const uint8_t  inBuffer,
+                 const uint8_t  inFilterNum,
+                 const bool     inIsExtended,
+                 const uint32_t inFilter);
   uint8_t mask(const uint8_t inBuffer, const maskOrFilterPos inPos);
   uint8_t filter(const uint8_t inBuffer, const uint8_t inFilter, const maskOrFilterPos inPos);
 
+private:
+  bool byteInMaskOrFilter(const uint32_t              inMaskOrFilter,
+                          const enum maskOrFilterPos  inPos,
+                          uint8_t&                    result);
 };
 
 /*-------------------------------------------------------------------------------------------------
@@ -136,21 +144,21 @@ public:
  */
 typedef  void (*CANDudeInterrupt)();
 
-/*-------------------------------------------------------------------------------------------------
- * Macro to intantiante a controller as long as its interrupt handler
- * and links them together.
- * _controller is the name of the controller object
- * _CSPin is the chip select pin to communicate with the MCP2515
- * _interruptPin is the external interrupt pin use to notify the MCU something
- * happened on the MCP2515
- */
-#define CANDudeController(_controller, _CSPin, _interruptPin) \
-void _controller ## InterruptFunction(); \
-CANDude _controller(_CSPin, _interruptPin, _controller ## InterruptFunction); \
-void _controller ## InterruptFunction() \
-{ \
-  _controller.handleInterrupt();\
-}
+// /*-------------------------------------------------------------------------------------------------
+//  * Macro to intantiante a controller as long as its interrupt handler
+//  * and links them together.
+//  * _controller is the name of the controller object
+//  * _CSPin is the chip select pin to communicate with the MCP2515
+//  * _interruptPin is the external interrupt pin use to notify the MCU something
+//  * happened on the MCP2515
+//  */
+// #define CANDudeController(_controller, _CSPin, _interruptPin) \
+// void _controller ## InterruptFunction(); \
+// CANDude _controller(_CSPin, _interruptPin, _controller ## InterruptFunction); \
+// void _controller ## InterruptFunction() \
+// { \
+//   _controller.handleInterrupt();\
+// }
 
 typedef enum {
   CANDudeOk,
@@ -168,79 +176,75 @@ class CANDude;
 /*-------------------------------------------------------------------------------------------------
  * CANDudeMessage is the class to store a CAN send message
  */
-class CANDudeSendMessage {
-  public : uint8_t sidh; 		// bits 10-3 of standard identifier
-  public : uint8_t sidl;		// bits 2-0 of sid, EXIDE and bits 17 and 16 of eid
-  public : uint8_t eid8;		// bits 15-8 of extended identifier
-  public : uint8_t eid0;  	// bits 7-0 of extended identifier
-  public : uint8_t dlc;			// data length and remote frame bit
-  public : uint8_t data[8];	// data
-
-  public : bool isExtended() const { return (sidl & mcp2515::TXBnSIDL_EXIDE) != 0; }
-  public : bool isRemote() const { return (dlc & mcp2515::TXBnDLC_RTR) != 0; }
-  public : void setStandardId(const uint16_t inId);
-  public : void setExtendedId(const uint32_t inId);
-  public : void setRemote(const bool inRemote);
-  public : uint8_t length() const { return dlc & mcp2515::TXBnDLC_DLC_MASK; }
-  public : void setLength(const uint8_t inLength);
-  public : uint8_t sizeInBytes() const;
-  private : const uint8_t * start() const { return &sidh; }
-  private : const uint8_t * dataPart() const { return data; }
-
-  public : void print() const;
-  public : void printRaw() const;
-
-  friend class CANDude;
-};
+// class CANDudeSendMessage {
+//   public : uint8_t sidh; 		// bits 10-3 of standard identifier
+//   public : uint8_t sidl;		// bits 2-0 of sid, EXIDE and bits 17 and 16 of eid
+//   public : uint8_t eid8;		// bits 15-8 of extended identifier
+//   public : uint8_t eid0;  	// bits 7-0 of extended identifier
+//   public : uint8_t dlc;			// data length and remote frame bit
+//   public : uint8_t data[8];	// data
+//
+//   public : bool isExtended() const { return (sidl & mcp2515::TXBnSIDL_EXIDE) != 0; }
+//   public : bool isRemote() const { return (dlc & mcp2515::TXBnDLC_RTR) != 0; }
+//   public : void setStandardId(const uint16_t inId);
+//   public : void setExtendedId(const uint32_t inId);
+//   public : void setRemote(const bool inRemote);
+//   public : uint8_t length() const { return dlc & mcp2515::TXBnDLC_DLC_MASK; }
+//   public : void setLength(const uint8_t inLength);
+//   public : uint8_t sizeInBytes() const;
+//   private : const uint8_t * start() const { return &sidh; }
+//   private : const uint8_t * dataPart() const { return data; }
+//
+//   public : void print() const;
+//   public : void printRaw() const;
+//
+//   friend class CANDude;
+// };
 
 /*-------------------------------------------------------------------------------------------------
  *
  */
-class CANDudeQueue {
-  private : uint8_t *mQueue;
-  private : uint16_t mSize;
-  private : uint8_t mIndex;
-  private : uint8_t mMask;
-  private : uint8_t mLockMask;
-  private : uint8_t mSavedMask;
-
-  public : CANDudeQueue(const uint8_t inSize);
-  public : uint8_t pushByte(const uint8_t inByte);
-  public : uint8_t pushByte(const uint8_t * const inBytes, const uint8_t inCount);
-  public : uint8_t popByte();
-  public : uint8_t popByte(uint8_t * const outBytes, const uint8_t inCount);
-  public : bool isEmpty() const { return mSize == 0; }
-  public : bool isFull() const { return mSize == ((uint16_t)mMask) + 1; }
-  public : uint16_t available() const { return mMask - mSize + 1; }
-  public : bool allocFailed() const { return mQueue == NULL; }
-  public : void print() const;
-};
+// class CANDudeQueue {
+//   private : uint8_t *mQueue;
+//   private : uint16_t mSize;
+//   private : uint8_t mIndex;
+//   private : uint8_t mMask;
+//   private : uint8_t mLockMask;
+//   private : uint8_t mSavedMask;
+//
+//   public : CANDudeQueue(const uint8_t inSize);
+//   public : uint8_t pushByte(const uint8_t inByte);
+//   public : uint8_t pushByte(const uint8_t * const inBytes, const uint8_t inCount);
+//   public : uint8_t popByte();
+//   public : uint8_t popByte(uint8_t * const outBytes, const uint8_t inCount);
+//   public : bool isEmpty() const { return mSize == 0; }
+//   public : bool isFull() const { return mSize == ((uint16_t)mMask) + 1; }
+//   public : uint16_t available() const { return mMask - mSize + 1; }
+//   public : bool allocFailed() const { return mQueue == NULL; }
+//   public : void print() const;
+// };
 
 /*-------------------------------------------------------------------------------------------------
  * CANDude is the base class to talk with a MCP2515
  */
 class CANDude
 {
-  private : uint8_t mSlaveSelectPin;
-  private : void select()   { digitalWrite(mSlaveSelectPin, LOW);  }
-  private : void unselect() { digitalWrite(mSlaveSelectPin, HIGH); }
+private:
+  uint8_t           mSlaveSelectPin;
 
-  private : uint8_t mInterruptPin;
-  private : CANDudeInterrupt mInterruptFunction;
+protected:
+  void select()   { digitalWrite(mSlaveSelectPin, LOW);  }
+  void unselect() { digitalWrite(mSlaveSelectPin, HIGH); }
 
-  // Send and receive queues
-  public : CANDudeQueue *mSendQueue;
-  private : CANDudeQueue *mReceiveQueue;
 
   // flag indicating how many send message are pending in the MCP2515
   // it is incremented when a message is loaded in the MCP2515
   // it is decremented for each TX flag set when an interrupt occurs
-  private : uint8_t mSendCount;
+
+public:
 
   // Constructor, init the slave select pin and the interrupt pin
-  public : CANDude(const uint8_t inSlaveSelectPin,
-                   const uint8_t inInterruptPin,
-                   const CANDudeInterrupt inInterruptFunction);
+  CANDude(const uint8_t inSlaveSelectPin);
 
   // Reset the MCP2515 by sending a reset command
   void reset();
@@ -291,11 +295,11 @@ class CANDude
 	 * bufferId is the identifier of the TX buffer.
 	 * It can be mcp2515::TX_BUFFER_0, mcp2515::TX_BUFFER_1 or
 	 * mcp2515::TX_BUFFER_2.
-	 * numberOfuint8_t is the number of uint8_ts to write to the message.
+	 * numberOfbytes is the number of bytes to write to the message.
 	 * buffer is a pointer from where the message will be read.
-	 * Size of the buffer should be at least numberOfuint8_t
+	 * Size of the buffer should be at least numberOfbytes
 	 */
-	void loadMessage(const uint8_t inBufferID, const CANDudeSendMessage &inMessage);
+	void loadMessage(const uint8_t inBufferID, uint8_t * inBuffer, uint8_t inNumberOfBytes);
 
 	/*
 	 * Request to send one or more TX buffer(s)
@@ -372,7 +376,7 @@ class CANDude
 	/*
 	 * Send a message
 	 */
-	CANDudeResult sendMessage(const CANDudeSendMessage & inMessage);
+//	CANDudeResult sendMessage(const CANDudeSendMessage & inMessage);
 
 	/*
 	 * Handle the MCP2515 interrupt

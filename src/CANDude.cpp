@@ -23,7 +23,7 @@
 #include <SPI.h>
 #include <CANDude.h>
 #include <HardwareSerial.h>
-#include <CANDudeSettings.h>
+#include <MCP2515Definitions.h>
 
 static const uint32_t kMaxBaudRateForTripleSampling = 125000;
 
@@ -33,9 +33,9 @@ static const uint32_t kMaxBaudRateForTripleSampling = 125000;
 CANDudeSettings::CANDudeSettings(const uint32_t inCANCrystal,
                                  const uint32_t inWishedBaudRate,
                                  const uint32_t inMaxPPMError) :
-mConfigOk(false),
 mWishedBaudRate(inWishedBaudRate),
-mCANCrystal(inCANCrystal)
+mCANCrystal(inCANCrystal),
+mConfigOk(false)
 {
   /*
    * out of range crytal frequency according to MCP2515 datasheet. So let
@@ -212,11 +212,11 @@ mBuffer1Mask(0UL)
 {
   for (uint8_t f = 0; f < 2; f++) {
     mBuffer0Filter[f].isExtended = false;
-    mBuffer0Filter[f].filter = (uint32_t)-1L;
+    mBuffer0Filter[f].filter = 0x1FFFFFFF;
   }
   for (uint8_t f = 0; f < 4; f++) {
     mBuffer1Filter[f].isExtended = false;
-    mBuffer1Filter[f].filter =  (uint32_t)-1L;
+    mBuffer1Filter[f].filter = 0x1FFFFFFF;
   }
 }
 
@@ -237,21 +237,24 @@ bool CANDudeFilters::setMask(const uint8_t inBuffer, const uint32_t inMask)
 /*-------------------------------------------------------------------------------------------------
  * Set one of the filter of one of the buffers (0 or 1). Return true if ok, false otherwise
  */
-bool CANDudeFilters::setFilter(const uint8_t inBuffer, const uint8_t inFilter, const bool inIsExtended, const uint32_t inFilter)
+bool CANDudeFilters::setFilter(const uint8_t  inBuffer,
+                               const uint8_t  inFilterNum,
+                               const bool     inIsExtended,
+                               const uint32_t inFilter)
 {
   bool result = true;
   switch (inBuffer) {
     case 0:
-      if (inFilter < 2) {
-        mBuffer0Filter[inFilter].isExtended = inIsExtended;
-        mBuffer0Filter[inFilter].filter = inFilter;
+      if (inFilterNum < 2) {
+        mBuffer0Filter[inFilterNum].isExtended = inIsExtended;
+        mBuffer0Filter[inFilterNum].filter = inFilter;
       }
       else result = false;
       break;
     case 1:
-      if (inFilter < 4) {
-        mBuffer1Filter[inFilter].isExtended = inIsExtended;
-        mBuffer1Filter[inFilter].filter = inFilter;
+      if (inFilterNum < 4) {
+        mBuffer1Filter[inFilterNum].isExtended = inIsExtended;
+        mBuffer1Filter[inFilterNum].filter = inFilter;
       }
       else result = false;
       break;
@@ -268,21 +271,24 @@ bool CANDudeFilters::setFilter(const uint8_t inBuffer, const uint8_t inFilter, c
  * CANDudeFilters::EID8
  * CANDudeFilters::EID0
  */
-bool byteInMaskOrFilter(const uint32_t inMaskOrFilter, const maskOrFilterPos inPos, uint8_t& result)
+bool CANDudeFilters::byteInMaskOrFilter(const uint32_t              inMaskOrFilter,
+                                        const enum maskOrFilterPos  inPos,
+                                        uint8_t&                    result)
 {
   bool status = true;
   switch (inPos) {
     case SIDH:
-      result = (uint8_t) ((mask >> 3) & 0xFF);
+      result = (uint8_t) ((inMaskOrFilter >> 3) & 0xFF);
       break;
     case SIDL:
-      result = (uint8_t) (((mask & RXFnSIDL_SID_MASK) << RXFnSIDL_SID_SHIFT) | ((mask >> 27) & 0x03));
+      result = (uint8_t) (((inMaskOrFilter & mcp2515::RXFnSIDL_SID_MASK) << mcp2515::RXFnSIDL_SID_SHIFT) |
+               ((inMaskOrFilter >> 27) & 0x03));
       break;
     case EID8:
-      result = (uint8_t) ((mask >> 19) & 0xFF);
+      result = (uint8_t) ((inMaskOrFilter >> 19) & 0xFF);
       break;
     case EID0:
-      result = (uint8_t) ((mask >> 11) & 0xFF);
+      result = (uint8_t) ((inMaskOrFilter >> 11) & 0xFF);
       break;
     default:
       status = false;
@@ -322,7 +328,9 @@ uint8_t CANDudeFilters::mask(const uint8_t inBuffer, const maskOrFilterPos inPos
  *
  * Returns all significant bits filled with 1 if inBuffer or inPos is out of range
  */
-uint8_t CANDudeFilters::filter(const uint8_t inBuffer, const uint8_t inFilter, const maskOrFilterPos inPos)
+uint8_t CANDudeFilters::filter(const uint8_t              inBuffer,
+                               const uint8_t              inFilter,
+                               const enum maskOrFilterPos inPos)
 {
   uint8_t result = (uint8_t) (-1);
   Filter_t filter;
@@ -345,7 +353,7 @@ uint8_t CANDudeFilters::filter(const uint8_t inBuffer, const uint8_t inFilter, c
   if (filterOk) {
     if (byteInMaskOrFilter(filter.filter, inPos, result)) {
       if (inPos == SIDL && filter.isExtended) {
-        result |= RXFnSIDL_EXIDE;
+        result |= mcp2515::RXFnSIDL_EXIDE;
       }
     }
   }
@@ -355,198 +363,198 @@ uint8_t CANDudeFilters::filter(const uint8_t inBuffer, const uint8_t inFilter, c
   return result;
 }
 
-/*============================================================================
- * CANDudeMessage is the class to handle both sent and receive messages
- *----------------------------------------------------------------------------
- */
-void CANDudeSendMessage::setStandardId(const uint16_t inId)
-{
-  sidh = (inId >> 3) & 0x00FF;
-  sidl = ((inId & mcp2515::TXBnSIDL_SID_MASK) << mcp2515::TXBnSIDL_SID_SHIFT);
-}
-
-/*----------------------------------------------------------------------------
- */
-void CANDudeSendMessage::setExtendedId(const uint32_t inId)
-{
-  sidh = (inId >> 3) & 0x000000FF;
-  sidl = ((inId & mcp2515::TXBnSIDL_SID_MASK) << mcp2515::TXBnSIDL_SID_SHIFT) |
-         mcp2515::TXBnSIDL_EXIDE |
-         ((inId >> 27) & mcp2515::TXBnSIDL_EID_MASK);
-  eid8 = (inId >> 19) & 0x000000FF;
-  eid0 = (inId >> 11) & 0x000000FF;
-}
-
-/*----------------------------------------------------------------------------
- */
-void CANDudeSendMessage::setRemote(const bool inRemote)
-{
-  if (inRemote) dlc |= mcp2515::TXBnDLC_RTR;
-  else dlc &= ~mcp2515::TXBnDLC_RTR;
-}
-
-/*----------------------------------------------------------------------------
- */
-void CANDudeSendMessage::setLength(const uint8_t inLength)
-{
-  dlc &= ~mcp2515::TXBnDLC_DLC_MASK;
-  dlc |= inLength & mcp2515::TXBnDLC_DLC_MASK;
-}
-
-/*----------------------------------------------------------------------------
- */
-uint8_t CANDudeSendMessage::sizeInBytes() const
-{
-  // 4 bytes for id and one for length + the number of bytes
-  return 5 + length();
-}
-
-/*----------------------------------------------------------------------------
- */
-void CANDudeSendMessage::print() const
-{
-  uint32_t id = ((uint32_t)sidh) << 3 | ((sidl >> mcp2515::TXBnSIDL_SID_SHIFT) & mcp2515::TXBnSIDL_SID_MASK);
-  char type = isExtended() ? 'e' : 's';
-  if (type == 'e') {
-    id |= (((uint32_t)eid8) << 19) | (((uint32_t)eid0) << 11) | (((uint32_t)(sidl & mcp2515::TXBnSIDL_EID_MASK)) << 27) ;
-  }
-  Serial.print(type);
-  Serial.print('[');
-  Serial.print(id);
-  Serial.print('/');
-  Serial.print(id, HEX);
-  Serial.print(']');
-  if (isRemote()) {
-    Serial.println('r');
-  }
-  else {
-    for (uint8_t i = 0; i < length(); i++) {
-      Serial.print(' ');
-      Serial.print(data[i], HEX);
-    }
-    Serial.println();
-  }
-}
-
-/*----------------------------------------------------------------------------
- */
-void CANDudeSendMessage::printRaw() const
-{
-  Serial.print("SIDH="); Serial.print(sidh, HEX);
-  Serial.print(" SIDL="); Serial.print(sidl, HEX);
-  Serial.print(" (");
-  Serial.print((sidl >> mcp2515::TXBnSIDL_SID_SHIFT) & mcp2515::TXBnSIDL_SID_MASK);
-  Serial.print(',');
-  Serial.print(isExtended() ? 'e' : 's');
-  Serial.print(',');
-  Serial.print(sidl & mcp2515::TXBnSIDL_EID_MASK);
-  Serial.print(')');
-  Serial.print(" EID8="); Serial.print(eid8, HEX);
-  Serial.print(" EID0="); Serial.print(eid0, HEX);
-  Serial.print(" DLC="); Serial.print(dlc, HEX);
-  Serial.print(" DATA=");
-  for (uint8_t i = 0; i < 8; i++) {
-    Serial.print(' ');
-    Serial.print(data[i], HEX);
-  }
-  Serial.println();
-}
-
-/*============================================================================
- * CANDudeQueue is the class to handle queues used to send and receive
- * messages
- *----------------------------------------------------------------------------
- * Constructor, init an empty queue.
- */
-CANDudeQueue::CANDudeQueue(const uint8_t inSize) :
-mSize(0),
-mIndex(0)
-{
-  uint8_t mask = 0xFF;
-  uint8_t size = inSize > 16 ? inSize - 1 : 15;
-  while (!(size & 0x80)) {
-    mask >>= 1;
-    size <<= 1;
-  }
-  mMask = mask;
-  mQueue = new uint8_t[((uint16_t)mask) + 1];
-}
-
-/*----------------------------------------------------------------------------
- * Push a byte in the queue if room available
- */
-uint8_t CANDudeQueue::pushByte(const uint8_t inByte)
-{
-  if (!isFull()) {
-    mQueue[mIndex++] = inByte;
-    mSize++;
-    mIndex &= mMask;
-    return 1;
-  }
-  else {
-    return 0;
-  }
-}
-
-/*----------------------------------------------------------------------------
- * Push bytes in the queue if room available. Returns how many bytes have
- * been pushed.
- */
-uint8_t CANDudeQueue::pushByte(const uint8_t * const inBytes, const uint8_t inCount)
-{
-  uint16_t freeSpace = available();
-  uint8_t howMany = inCount > freeSpace ? freeSpace : inCount;
-  for (uint8_t i = 0; i < howMany; i++) {
-    mQueue[mIndex++] = inBytes[i];
-    mIndex &= mMask;
-  }
-  mSize += howMany;
-  return howMany;
-}
-
-/*----------------------------------------------------------------------------
- * Pop a byte from the queue if not empty
- */
-uint8_t CANDudeQueue::popByte()
-{
-  if (mSize > 0) {
-    uint8_t readIndex = (mIndex - mSize) & mMask;
-    mSize--;
-    return mQueue[readIndex];
-  }
-  else return 0;
-}
-
-/*----------------------------------------------------------------------------
- * Pop a bytes from the queue if available, returns how many bytes have been
- * popped
- */
-uint8_t CANDudeQueue::popByte(uint8_t * const outBytes, const uint8_t inCount)
-{
-  uint8_t howMany = inCount > mSize ? mSize : inCount;
-  uint8_t readIndex = (mIndex - mSize) & mMask;
-  for (uint8_t i = 0; i < howMany; i++) {
-    outBytes[i] = mQueue[readIndex++];
-    readIndex &= mMask;
-  }
-  return howMany;
-}
-
-/*----------------------------------------------------------------------------
- * Prints the queue (for debug)
- */
-void CANDudeQueue::print() const
-{
-  uint8_t readIndex = (mIndex - mSize) & mMask;
-  uint8_t size = mSize;
-  Serial.print('['); Serial.print(mSize); Serial.print("] ");
-  while (size-- > 0) {
-    Serial.print(mQueue[readIndex++], HEX);
-    Serial.print(' ');
-    readIndex &= mMask;
-  }
-  Serial.println();
-}
+// /*============================================================================
+//  * CANDudeMessage is the class to handle both sent and receive messages
+//  *----------------------------------------------------------------------------
+//  */
+// void CANDudeSendMessage::setStandardId(const uint16_t inId)
+// {
+//   sidh = (inId >> 3) & 0x00FF;
+//   sidl = ((inId & mcp2515::TXBnSIDL_SID_MASK) << mcp2515::TXBnSIDL_SID_SHIFT);
+// }
+//
+// /*----------------------------------------------------------------------------
+//  */
+// void CANDudeSendMessage::setExtendedId(const uint32_t inId)
+// {
+//   sidh = (inId >> 3) & 0x000000FF;
+//   sidl = ((inId & mcp2515::TXBnSIDL_SID_MASK) << mcp2515::TXBnSIDL_SID_SHIFT) |
+//          mcp2515::TXBnSIDL_EXIDE |
+//          ((inId >> 27) & mcp2515::TXBnSIDL_EID_MASK);
+//   eid8 = (inId >> 19) & 0x000000FF;
+//   eid0 = (inId >> 11) & 0x000000FF;
+// }
+//
+// /*----------------------------------------------------------------------------
+//  */
+// void CANDudeSendMessage::setRemote(const bool inRemote)
+// {
+//   if (inRemote) dlc |= mcp2515::TXBnDLC_RTR;
+//   else dlc &= ~mcp2515::TXBnDLC_RTR;
+// }
+//
+// /*----------------------------------------------------------------------------
+//  */
+// void CANDudeSendMessage::setLength(const uint8_t inLength)
+// {
+//   dlc &= ~mcp2515::TXBnDLC_DLC_MASK;
+//   dlc |= inLength & mcp2515::TXBnDLC_DLC_MASK;
+// }
+//
+// /*----------------------------------------------------------------------------
+//  */
+// uint8_t CANDudeSendMessage::sizeInBytes() const
+// {
+//   // 4 bytes for id and one for length + the number of bytes
+//   return 5 + length();
+// }
+//
+// /*----------------------------------------------------------------------------
+//  */
+// void CANDudeSendMessage::print() const
+// {
+//   uint32_t id = ((uint32_t)sidh) << 3 | ((sidl >> mcp2515::TXBnSIDL_SID_SHIFT) & mcp2515::TXBnSIDL_SID_MASK);
+//   char type = isExtended() ? 'e' : 's';
+//   if (type == 'e') {
+//     id |= (((uint32_t)eid8) << 19) | (((uint32_t)eid0) << 11) | (((uint32_t)(sidl & mcp2515::TXBnSIDL_EID_MASK)) << 27) ;
+//   }
+//   Serial.print(type);
+//   Serial.print('[');
+//   Serial.print(id);
+//   Serial.print('/');
+//   Serial.print(id, HEX);
+//   Serial.print(']');
+//   if (isRemote()) {
+//     Serial.println('r');
+//   }
+//   else {
+//     for (uint8_t i = 0; i < length(); i++) {
+//       Serial.print(' ');
+//       Serial.print(data[i], HEX);
+//     }
+//     Serial.println();
+//   }
+// }
+//
+// /*----------------------------------------------------------------------------
+//  */
+// void CANDudeSendMessage::printRaw() const
+// {
+//   Serial.print("SIDH="); Serial.print(sidh, HEX);
+//   Serial.print(" SIDL="); Serial.print(sidl, HEX);
+//   Serial.print(" (");
+//   Serial.print((sidl >> mcp2515::TXBnSIDL_SID_SHIFT) & mcp2515::TXBnSIDL_SID_MASK);
+//   Serial.print(',');
+//   Serial.print(isExtended() ? 'e' : 's');
+//   Serial.print(',');
+//   Serial.print(sidl & mcp2515::TXBnSIDL_EID_MASK);
+//   Serial.print(')');
+//   Serial.print(" EID8="); Serial.print(eid8, HEX);
+//   Serial.print(" EID0="); Serial.print(eid0, HEX);
+//   Serial.print(" DLC="); Serial.print(dlc, HEX);
+//   Serial.print(" DATA=");
+//   for (uint8_t i = 0; i < 8; i++) {
+//     Serial.print(' ');
+//     Serial.print(data[i], HEX);
+//   }
+//   Serial.println();
+// }
+//
+// /*============================================================================
+//  * CANDudeQueue is the class to handle queues used to send and receive
+//  * messages
+//  *----------------------------------------------------------------------------
+//  * Constructor, init an empty queue.
+//  */
+// CANDudeQueue::CANDudeQueue(const uint8_t inSize) :
+// mSize(0),
+// mIndex(0)
+// {
+//   uint8_t mask = 0xFF;
+//   uint8_t size = inSize > 16 ? inSize - 1 : 15;
+//   while (!(size & 0x80)) {
+//     mask >>= 1;
+//     size <<= 1;
+//   }
+//   mMask = mask;
+//   mQueue = new uint8_t[((uint16_t)mask) + 1];
+// }
+//
+// /*----------------------------------------------------------------------------
+//  * Push a byte in the queue if room available
+//  */
+// uint8_t CANDudeQueue::pushByte(const uint8_t inByte)
+// {
+//   if (!isFull()) {
+//     mQueue[mIndex++] = inByte;
+//     mSize++;
+//     mIndex &= mMask;
+//     return 1;
+//   }
+//   else {
+//     return 0;
+//   }
+// }
+//
+// /*----------------------------------------------------------------------------
+//  * Push bytes in the queue if room available. Returns how many bytes have
+//  * been pushed.
+//  */
+// uint8_t CANDudeQueue::pushByte(const uint8_t * const inBytes, const uint8_t inCount)
+// {
+//   uint16_t freeSpace = available();
+//   uint8_t howMany = inCount > freeSpace ? freeSpace : inCount;
+//   for (uint8_t i = 0; i < howMany; i++) {
+//     mQueue[mIndex++] = inBytes[i];
+//     mIndex &= mMask;
+//   }
+//   mSize += howMany;
+//   return howMany;
+// }
+//
+// /*----------------------------------------------------------------------------
+//  * Pop a byte from the queue if not empty
+//  */
+// uint8_t CANDudeQueue::popByte()
+// {
+//   if (mSize > 0) {
+//     uint8_t readIndex = (mIndex - mSize) & mMask;
+//     mSize--;
+//     return mQueue[readIndex];
+//   }
+//   else return 0;
+// }
+//
+// /*----------------------------------------------------------------------------
+//  * Pop a bytes from the queue if available, returns how many bytes have been
+//  * popped
+//  */
+// uint8_t CANDudeQueue::popByte(uint8_t * const outBytes, const uint8_t inCount)
+// {
+//   uint8_t howMany = inCount > mSize ? mSize : inCount;
+//   uint8_t readIndex = (mIndex - mSize) & mMask;
+//   for (uint8_t i = 0; i < howMany; i++) {
+//     outBytes[i] = mQueue[readIndex++];
+//     readIndex &= mMask;
+//   }
+//   return howMany;
+// }
+//
+// /*----------------------------------------------------------------------------
+//  * Prints the queue (for debug)
+//  */
+// void CANDudeQueue::print() const
+// {
+//   uint8_t readIndex = (mIndex - mSize) & mMask;
+//   uint8_t size = mSize;
+//   Serial.print('['); Serial.print(mSize); Serial.print("] ");
+//   while (size-- > 0) {
+//     Serial.print(mQueue[readIndex++], HEX);
+//     Serial.print(' ');
+//     readIndex &= mMask;
+//   }
+//   Serial.println();
+// }
 /*============================================================================
  */
 static const uint8_t CAN_MESSAGE_MAX_LENGTH = 8;
@@ -565,15 +573,8 @@ static const SPISettings kMcp2515Settings(10000000, MSBFIRST, SPI_MODE0);
  *----------------------------------------------------------------------------
  * Constructor. Set the chip select pin
  */
-CANDude::CANDude(const uint8_t inSlaveSelectPin,
-                 const uint8_t inInterruptPin,
-                 const CANDudeInterrupt inInterruptFunction) :
-mSlaveSelectPin(inSlaveSelectPin),
-mInterruptPin(inInterruptPin),
-mInterruptFunction(inInterruptFunction),
-mReceiveQueue(NULL),
-mSendQueue(NULL),
-mSendCount(0)
+CANDude::CANDude(const uint8_t inSlaveSelectPin) :
+mSlaveSelectPin(inSlaveSelectPin)
 {
 }
 
@@ -696,22 +697,20 @@ void CANDude::readRawMessage(
  */
 void CANDude::loadMessage(
   const uint8_t inBufferID,
-  const CANDudeSendMessage &inMessage)
+  uint8_t *     inBuffer,
+  uint8_t       inNumberOfBytes)
 {
-  uint8_t numberOfBytes = inMessage.sizeInBytes();
-  const uint8_t *dataPtr = inMessage.start();
   Serial.print("S: ");
   Serial.print(mcp2515::LOAD_TX_BUFFER(inBufferID), BIN);
-  for (uint8_t i = 0; i < numberOfBytes; i++) {
+  for (uint8_t i = 0; i < inNumberOfBytes; i++) {
     Serial.print(' ');
-    Serial.print(*dataPtr++, BIN);
+    Serial.print(inBuffer[i], BIN);
   }
   Serial.println();
-  dataPtr = inMessage.start();
   SPIBeginTransaction();
   select();
   SPI.transfer(mcp2515::LOAD_TX_BUFFER(inBufferID));
-  while (numberOfBytes--) SPI.transfer(*dataPtr++);
+  while (inNumberOfBytes--) SPI.transfer(*inBuffer++);
   unselect();
   SPIEndTransaction();
 }
@@ -855,45 +854,45 @@ CANDudeResult CANDude::begin(const CANDudeSettings & inSettings)
     write(mcp2515::CNF3, 3 /* 3 registers */, cnf);
 
     //---- Program Interrupts
-    pinMode(mInterruptPin, INPUT);
-    uint8_t interruptNumber = digitalPinToInterrupt(mInterruptPin);
-    SPI.usingInterrupt(interruptNumber);
-    attachInterrupt(interruptNumber, mInterruptFunction, FALLING);
-    //---- Enable RXB0 and TXB0 Interrupts
-    write(mcp2515::CANINTE, mcp2515::CANINTE_TX0IE | mcp2515::CANINTE_RX0IE);
-
+    // pinMode(mInterruptPin, INPUT);
+    // uint8_t interruptNumber = digitalPinToInterrupt(mInterruptPin);
+    // SPI.usingInterrupt(interruptNumber);
+    // attachInterrupt(interruptNumber, mInterruptFunction, FALLING);
+    // //---- Enable RXB0 and TXB0 Interrupts
+    // write(mcp2515::CANINTE, mcp2515::CANINTE_TX0IE | mcp2515::CANINTE_RX0IE);
+    //
     // Go back to normal mode
     result = setMode(mcp2515::NORMAL_MODE);
   }
   return result;
 }
 
-/*----------------------------------------------------------------------------
- * Send a message
- */
-CANDudeResult CANDude::sendMessage(const CANDudeSendMessage & inMessage)
-{
-  if (mSendCount > 0) {
-    if (mSendQueue->available() >= inMessage.sizeInBytes()) {
-      mSendQueue->pushByte(inMessage.start(), 5);
-      mSendQueue->pushByte(inMessage.dataPart(), inMessage.length());
-      return CANDudeOk;
-    }
-    else {
-      return CANDudeNoRoom;
-    }
-  }
-  else {
-    loadMessage(0, inMessage);
-  }
-}
+// /*----------------------------------------------------------------------------
+//  * Send a message
+//  */
+// CANDudeResult CANDude::sendMessage(const CANDudeSendMessage & inMessage)
+// {
+//   if (mSendCount > 0) {
+//     if (mSendQueue->available() >= inMessage.sizeInBytes()) {
+//       mSendQueue->pushByte(inMessage.start(), 5);
+//       mSendQueue->pushByte(inMessage.dataPart(), inMessage.length());
+//       return CANDudeOk;
+//     }
+//     else {
+//       return CANDudeNoRoom;
+//     }
+//   }
+//   else {
+//     loadMessage(0, inMessage);
+//   }
+// }
 
-/*----------------------------------------------------------------------------
- * Handle the MCP2515 interrupt
- */
-void CANDude::handleInterrupt()
-{
-}
+// /*----------------------------------------------------------------------------
+//  * Handle the MCP2515 interrupt
+//  */
+// void CANDude::handleInterrupt()
+// {
+// }
 
 // /*----------------------------------------------------------------------------
 //  * Read a RX buffer with the header of the message by

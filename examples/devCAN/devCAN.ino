@@ -1,7 +1,7 @@
 #include <CANDude.h>
 #include <SPI.h>
 
-CANDudeController(controller, 9, 2)
+CANDude controller(9);
 
 uint8_t buf[256];
 
