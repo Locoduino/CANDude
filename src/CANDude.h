@@ -1,6 +1,6 @@
-/*=======================================================================================
+/*=================================================================================================
  * CANDude.h
- *---------------------------------------------------------------------------------------
+ *-------------------------------------------------------------------------------------------------
  * Classes to manage a MCP 2515 Can controller
  *
  * LOCODUINO, http://www.locoduino.org
@@ -26,14 +26,117 @@
 #include <Arduino.h>
 #include <MCP2515Definitions.h>
 
-class CANDudeSettings;
+/*-----------------------------------------------------------------------------
+ * CANDudeSettings class handle a setting of the CAN bus
+ *
+ * Initialization of CANDude starts with the instantiation of a CANDudeSettings
+ * object. The constructor takes at least 2 arguments:
+ * 1) the crystal frequency of the MCP2515
+ * 2) the wished baudrate of the CAN bus
+ * 3) the optional maximum PPM to accept a configuration. 600 is the default
+ *    value
+ * From that, a configuration of the bit timing is done
+ */
+class CANDudeSettings
+{
+private:
+  uint32_t  mWishedBaudRate;  /* Wished baud rate in bits/s as specified in the constructor       */
+  uint32_t  mCANCrystal;      /* Frequency in Hertz of the MCP2515 crystal                        */
+  bool      mConfigOk;        /* At start mConfigOk is set to false.
+                                 If the configuration is doable, it is set to true                */
+  uint8_t   mBRP;             /* Baud Rate Prescaler. Ranges from 0 to 63. Actual Value is mBRP+1 */
+  uint8_t   mPS;              /* Propagation Segment. Ranges from 0 to 7. Actual value is mPS+1   */
+  uint8_t   mPS1;             /* Phase Segment 1. Ranges from 0 to 7. Actual value is mPS1+1      */
+  uint8_t   mPS2;             /* Phase Segment 2. Ranges from 1 to 7. Actual value is mPS2+1      */
+  uint8_t   mSJW;             /* Sync Jump Width. Ranges from 0 to 3. Actual value is mSJW+1      */
+  bool      mTripleSampling;  /* Triple sampling                                                  */
 
-/*---------------------------------------------------------------------------------------
+public:
+  /*
+   * constructor
+   */
+  CANDudeSettings(const uint32_t inCANCrystal,
+                  const uint32_t inWishedBaudRate,
+                  const uint32_t inMaxPPMError = 600);
+  /*
+   * Accessors
+   */
+  uint32_t baudRate() const   { return mWishedBaudRate; }
+  uint32_t CANCrystal() const { return mCANCrystal;     }
+  bool configOk() const       { return mConfigOk;       }
+  uint8_t brp() const         { return mBRP;            }
+  uint8_t ps() const          { return mPS;             }
+  uint8_t ps1() const         { return mPS1;            }
+  uint8_t ps2() const         { return mPS2;            }
+  uint8_t sjw() const         { return mSJW;            }
+  bool tripleSampling() const { return mTripleSampling; }
+
+  /*
+   * actualBaudRate computes the actual baud rate of the configuration that
+   * may be different from the wished baudrate if the latter is no possible
+   */
+  public : uint32_t actualBaudRate() const;
+
+  /*
+   * absoluteError returns the difference between the actual baud rate and the
+   * wished baud rate.
+   */
+  public : int32_t absoluteError() const {
+    return actualBaudRate() - mWishedBaudRate;
+  }
+
+  /*
+   * samplePoint returns the position of the sample point multiplied by 1000
+   */
+  public : uint16_t samplePoint() const;
+
+  /*
+   * PPMError returns the relative baud rate error expressed in parts per million
+   */
+  public : uint32_t PPMError() const;
+
+  /*
+   * timeQuantaCount returns the number of time quantum (TQ) in a bit
+   */
+  public : uint8_t timeQuantaCount()const;
+
+  /*
+   * print the configuration for debug purpose
+   */
+  public : void print() const;
+};
+
+class CANDudeFilters {
+
+private:
+  typedef struct {
+    bool     isExtended : 1;
+    uint32_t filter : 31;
+  } Filter_t;
+
+  uint32_t mBuffer0Mask;
+  Filter_t mBuffer0Filter[2];
+  uint32_t mBuffer1Mask;
+  Filter_t mBuffer1Filter[4];
+
+  uint8_t byteInMaskOrFilter(const uint32_t inMaskOrFilter, const maskOrFilterPos inPos, const uint8_t defaultResult);
+
+public:
+  enum maskOrFilterPos { SIDH = 0, SIDL = 1, EID8 = 2, EID0 = 3 };
+  CANDudeFilters();
+  bool setMask(const uint8_t inBuffer, const uint32_t inMask);
+  bool setFilter(const uint8_t inBuffer, const uint8_t inFilter, const bool inIsExtended, const uint32_t inFilter);
+  uint8_t mask(const uint8_t inBuffer, const maskOrFilterPos inPos);
+  uint8_t filter(const uint8_t inBuffer, const uint8_t inFilter, const maskOrFilterPos inPos);
+
+};
+
+/*-------------------------------------------------------------------------------------------------
  * function pointer for interrupt handlers
  */
 typedef  void (*CANDudeInterrupt)();
 
-/*---------------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------------------------------
  * Macro to intantiante a controller as long as its interrupt handler
  * and links them together.
  * _controller is the name of the controller object
@@ -62,7 +165,7 @@ typedef enum {
 
 class CANDude;
 
-/*---------------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------------------------------
  * CANDudeMessage is the class to store a CAN send message
  */
 class CANDudeSendMessage {
@@ -90,7 +193,7 @@ class CANDudeSendMessage {
   friend class CANDude;
 };
 
-/*---------------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------------------------------
  *
  */
 class CANDudeQueue {
@@ -113,7 +216,7 @@ class CANDudeQueue {
   public : void print() const;
 };
 
-/*---------------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------------------------------
  * CANDude is the base class to talk with a MCP2515
  */
 class CANDude
@@ -270,7 +373,7 @@ class CANDude
 	 * Send a message
 	 */
 	CANDudeResult sendMessage(const CANDudeSendMessage & inMessage);
-	
+
 	/*
 	 * Handle the MCP2515 interrupt
 	 */
