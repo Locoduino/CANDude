@@ -113,30 +113,36 @@ class CANDudeFilters {
 
 private:
   typedef struct {
+    bool     isSet : 1;
     bool     isExtended : 1;
-    uint32_t filter : 31;
+    uint32_t filter : 30;
   } Filter_t;
 
-  uint32_t mBuffer0Mask;
-  Filter_t mBuffer0Filter[2];
-  uint32_t mBuffer1Mask;
-  Filter_t mBuffer1Filter[4];
+  typedef struct {
+    bool     isSet : 1;
+    uint32_t mask : 31;
+  } Mask_t;
+
+  Mask_t   mMask[2];
+  Filter_t mFilter[6];
 
 public:
   enum maskOrFilterPos { SIDH = 0, SIDL = 1, EID8 = 2, EID0 = 3 };
   CANDudeFilters();
   bool setMask(const uint8_t inBuffer, const uint32_t inMask);
-  bool setFilter(const uint8_t  inBuffer,
-                 const uint8_t  inFilterNum,
+  bool setFilter(const uint8_t  inFilterNum,
                  const bool     inIsExtended,
                  const uint32_t inFilter);
   uint8_t mask(const uint8_t inBuffer, const maskOrFilterPos inPos);
-  uint8_t filter(const uint8_t inBuffer, const uint8_t inFilter, const maskOrFilterPos inPos);
-
+  uint8_t filter(const uint8_t         inFilter,
+                 const maskOrFilterPos inPos);
+  bool isConfigured(const uint8_t inBuffer);
+  void finalize();
+  void print();
 private:
-  bool byteInMaskOrFilter(const uint32_t              inMaskOrFilter,
-                          const enum maskOrFilterPos  inPos,
-                          uint8_t&                    result);
+  bool byteInMaskOrFilter(const uint32_t        inMaskOrFilter,
+                          const maskOrFilterPos inPos,
+                          uint8_t&              result);
 };
 
 /*-------------------------------------------------------------------------------------------------

@@ -8,6 +8,20 @@ uint8_t buf[256];
 void setup() {
   Serial.begin(115200);
   Serial.println("C'est parti");
+
+  /* Teste la configuration des filtres */
+
+  CANDudeFilters filters;
+
+  filters.setMask(0, 0x3FF);        /* Buffer 0 mask */
+  filters.setFilter(0, false, 0x20);
+  filters.setMask(1, 0x1FFFFFFF);   /* Buffer 1 mask */
+  filters.setFilter(2, true, 0x1FFFFF00);
+  filters.print();
+  filters.finalize();
+  filters.print();
+
+  /* Démarre le controlleur CAN */
   if (controller.begin(CANDudeSettings(mcp2515::CRYSTAL_16MHZ, 250000)) == CANDudeOk) {
     Serial.println("Connexion Ok");
     controller.read(0, 256, buf);

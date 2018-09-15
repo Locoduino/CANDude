@@ -27,6 +27,44 @@
 
 static const uint32_t kMaxBaudRateForTripleSampling = 125000;
 
+static void printByteWithLeadingZeroes(
+  const uint8_t inValue,
+  const bool    inNewline = false)
+{
+  uint8_t mask = B10000000;
+  while (mask != 0) {
+    Serial.print((mask & inValue) != 0);
+    mask >>= 1;
+  }
+  if (inNewline) Serial.println();
+}
+
+static void printExtendedID(
+  const uint32_t inValue,
+  const bool     inNewline = false)
+{
+  uint32_t mask = 0x10000000;
+  while (mask != 0) {
+    Serial.print((mask & inValue) != 0);
+    mask >>= 1;
+  }
+  if (inNewline) Serial.println();
+}
+
+static void printStandardID(
+  const uint32_t inValue,
+  const bool     inNewline = false)
+{
+  uint32_t mask = 0x00000400;
+  while (mask != 0) {
+    Serial.print((mask & inValue) != 0);
+    mask >>= 1;
+  }
+  if (inNewline) Serial.println();
+}
+
+static const bool EOL = true;
+
 /*----------------------------------------------------------------------------
  * Constructor. Does computation of bit timing
  */
@@ -70,7 +108,8 @@ mConfigOk(false)
     //---- Compute error with BRP + 1
     if (BRP < 64) {
       //---- error is always >= 0
-      const uint32_t error = inWishedBaudRate - (CANClock / TQCount / (BRP + 1));
+      const uint32_t error = inWishedBaudRate -
+                             (CANClock / TQCount / (BRP + 1));
       if (error < smallestError) {
         smallestError = error;
         bestBRP = BRP + 1;
@@ -206,17 +245,13 @@ uint16_t CANDudeSettings::samplePoint() const
 /*-------------------------------------------------------------------------------------------------
  * Constructor. Initialize the masks and the filters so that no message is accepted
  */
-CANDudeFilters::CANDudeFilters() :
-mBuffer0Mask(0UL),
-mBuffer1Mask(0UL)
+CANDudeFilters::CANDudeFilters()
 {
-  for (uint8_t f = 0; f < 2; f++) {
-    mBuffer0Filter[f].isExtended = false;
-    mBuffer0Filter[f].filter = 0x1FFFFFFF;
+  for (uint8_t m = 0; m < 2; m++) {
+    mMask[m].isSet = false;
   }
-  for (uint8_t f = 0; f < 4; f++) {
-    mBuffer1Filter[f].isExtended = false;
-    mBuffer1Filter[f].filter = 0x1FFFFFFF;
+  for (uint8_t f = 0; f < 6; f++) {
+    mFilter[f].isSet = false;
   }
 }
 
@@ -226,41 +261,29 @@ mBuffer1Mask(0UL)
 bool CANDudeFilters::setMask(const uint8_t inBuffer, const uint32_t inMask)
 {
   bool status = true;
-  switch (inBuffer) {
-    case 0: mBuffer0Mask = inMask; break;
-    case 1: mBuffer1Mask = inMask; break;
-    default: status = false;
+  if (inBuffer < 2) {
+    mMask[inBuffer].isSet = true;
+    mMask[inBuffer].mask = inMask;
   }
+  else status = false;
   return status;
 }
 
 /*-------------------------------------------------------------------------------------------------
  * Set one of the filter of one of the buffers (0 or 1). Return true if ok, false otherwise
  */
-bool CANDudeFilters::setFilter(const uint8_t  inBuffer,
-                               const uint8_t  inFilterNum,
+bool CANDudeFilters::setFilter(const uint8_t  inFilterNum,
                                const bool     inIsExtended,
                                const uint32_t inFilter)
 {
-  bool result = true;
-  switch (inBuffer) {
-    case 0:
-      if (inFilterNum < 2) {
-        mBuffer0Filter[inFilterNum].isExtended = inIsExtended;
-        mBuffer0Filter[inFilterNum].filter = inFilter;
-      }
-      else result = false;
-      break;
-    case 1:
-      if (inFilterNum < 4) {
-        mBuffer1Filter[inFilterNum].isExtended = inIsExtended;
-        mBuffer1Filter[inFilterNum].filter = inFilter;
-      }
-      else result = false;
-      break;
-    default: result = false;
+  bool status = true;
+  if (inFilterNum < 6) {
+    mFilter[inFilterNum].isSet = true;
+    mFilter[inFilterNum].isExtended = inIsExtended;
+    mFilter[inFilterNum].filter = inFilter;
   }
-  return result;
+  else status = false;
+  return status;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -271,9 +294,9 @@ bool CANDudeFilters::setFilter(const uint8_t  inBuffer,
  * CANDudeFilters::EID8
  * CANDudeFilters::EID0
  */
-bool CANDudeFilters::byteInMaskOrFilter(const uint32_t              inMaskOrFilter,
-                                        const enum maskOrFilterPos  inPos,
-                                        uint8_t&                    result)
+bool CANDudeFilters::byteInMaskOrFilter(const uint32_t        inMaskOrFilter,
+                                        const maskOrFilterPos inPos,
+                                        uint8_t&              result)
 {
   bool status = true;
   switch (inPos) {
@@ -281,7 +304,8 @@ bool CANDudeFilters::byteInMaskOrFilter(const uint32_t              inMaskOrFilt
       result = (uint8_t) ((inMaskOrFilter >> 3) & 0xFF);
       break;
     case SIDL:
-      result = (uint8_t) (((inMaskOrFilter & mcp2515::RXFnSIDL_SID_MASK) << mcp2515::RXFnSIDL_SID_SHIFT) |
+      result = (uint8_t) (((inMaskOrFilter & mcp2515::RXFnSIDL_SID_MASK)
+                                            << mcp2515::RXFnSIDL_SID_SHIFT) |
                ((inMaskOrFilter >> 27) & 0x03));
       break;
     case EID8:
@@ -296,8 +320,9 @@ bool CANDudeFilters::byteInMaskOrFilter(const uint32_t              inMaskOrFilt
   return status;
 }
 
-/*-------------------------------------------------------------------------------------------------
- * Returns one of the 4 MCP2515 registers falue for a mask. inPos should be one of the following:
+/*-----------------------------------------------------------------------------
+ * Returns one of the 4 MCP2515 registers values for a mask.
+ * inPos should be one of the following:
  * CANDudeFilters::SIDH
  * CANDudeFilters::SIDL
  * CANDudeFilters::EID8
@@ -308,49 +333,32 @@ bool CANDudeFilters::byteInMaskOrFilter(const uint32_t              inMaskOrFilt
 uint8_t CANDudeFilters::mask(const uint8_t inBuffer, const maskOrFilterPos inPos)
 {
   uint8_t result = 0;
-  uint32_t mask = 0UL;
-  bool maskOk = false;
 
-  switch (inBuffer) {
-    case 0: mask = mBuffer0Mask; maskOk = true; break;
-    case 1: mask = mBuffer1Mask; maskOk = true; break;
+  if (inBuffer < 2) {
+    byteInMaskOrFilter(mMask[inBuffer].mask, inPos, result);
   }
-  if (maskOk) byteInMaskOrFilter(mask, inPos, result);
   return result;
 }
 
-/*-------------------------------------------------------------------------------------------------
- * Returns one of the 4 MCP2515 registers falue for a filter. inPos should be one of the following:
+/*-----------------------------------------------------------------------------
+ * Returns one of the 4 MCP2515 registers value for a filter.
+ * inPos should be one of the following:
  * CANDudeFilters::SIDH
  * CANDudeFilters::SIDL
  * CANDudeFilters::EID8
  * CANDudeFilters::EID0
  *
- * Returns all significant bits filled with 1 if inBuffer or inPos is out of range
+ * Returns all significant bits filled with 1 if inBuffer or inPos
+ * is out of range
  */
-uint8_t CANDudeFilters::filter(const uint8_t              inBuffer,
-                               const uint8_t              inFilter,
-                               const enum maskOrFilterPos inPos)
+uint8_t CANDudeFilters::filter(const uint8_t          inFilter,
+                               const maskOrFilterPos  inPos)
 {
   uint8_t result = (uint8_t) (-1);
   Filter_t filter;
-  bool filterOk = false;
 
-  switch (inBuffer) {
-    case 0:
-      if (inFilter < 2) {
-        filter = mBuffer0Filter[inFilter];
-        filterOk = true;
-      }
-      break;
-    case 1:
-      if (inFilter < 4) {
-        filter = mBuffer1Filter[inFilter];
-        filterOk = true;
-      }
-      break;
-  }
-  if (filterOk) {
+  if (inFilter < 6) {
+    filter = mFilter[inFilter];
     if (byteInMaskOrFilter(filter.filter, inPos, result)) {
       if (inPos == SIDL && filter.isExtended) {
         result |= mcp2515::RXFnSIDL_EXIDE;
@@ -361,6 +369,124 @@ uint8_t CANDudeFilters::filter(const uint8_t              inBuffer,
     result = B11101011;
   }
   return result;
+}
+
+/*-----------------------------------------------------------------------------
+ * Check at least one mask and filter are configured for a message buffers
+ */
+bool CANDudeFilters::isConfigured(const uint8_t inBuffer)
+{
+  bool status = false;
+  if (inBuffer < 2) {
+    if (mMask[inBuffer].isSet) {
+      uint8_t startFilterNum = (inBuffer == 0) ? 0 : 2;
+      uint8_t endFilterNum = (inBuffer == 0) ? 2 : 6;
+      for (uint8_t f = startFilterNum; f < endFilterNum; f++) {
+        if (mFilter[f].isSet) {
+          status = true;
+          break;
+        }
+      }
+    }
+  }
+  return status;
+}
+
+/*-----------------------------------------------------------------------------
+ * Compute the unset filters if mask is set and at least one filter is set
+ * copy the set filter to the unset filters.
+ */
+void CANDudeFilters::finalize()
+{
+  for (uint8_t m = 0; m < 2; m++) {
+    if (mMask[m].isSet) {
+      uint8_t startFilterNum = (m == 0) ? 0 : 2;
+      uint8_t endFilterNum = (m == 0) ? 2 : 6;
+      /* search for a filter that is set */
+      uint8_t filterSet;
+      for (uint8_t f = startFilterNum; f < endFilterNum; f++) {
+        if (mFilter[f].isSet) {
+          for (uint8_t ff = startFilterNum; ff < endFilterNum; ff++) {
+            if (!mFilter[ff].isSet) {
+              mFilter[ff] = mFilter[f];
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+}
+
+/*-----------------------------------------------------------------------------
+ * print the filter inSettings
+ */
+void CANDudeFilters::print()
+{
+  Serial.println(F("** Buffer 0"));
+  Serial.print(mMask[0].isSet ? '+' : '-');
+  Serial.print(F("MASK : "));
+  printExtendedID(mMask[0].mask);
+  Serial.print(F(" : SIDH = "));
+  printByteWithLeadingZeroes(mask(0,SIDH));
+  Serial.print(F(" SIDL = "));
+  printByteWithLeadingZeroes(mask(0,SIDL));
+  Serial.print(F(" EID8 = "));
+  printByteWithLeadingZeroes(mask(0,EID8));
+  Serial.print(F(" EID0 = "));
+  printByteWithLeadingZeroes(mask(0,EID0), EOL);
+  for (int f = 0; f < 2; f++) {
+    Serial.print(mFilter[f].isSet ? '+' : '-');
+    Serial.print(F("FILTER "));
+    Serial.print(f);
+    Serial.print(F(" : "));
+    if (mFilter[f].isExtended) {
+      printExtendedID(mFilter[f].filter);
+    }
+    else {
+      printStandardID(mFilter[f].filter);
+    }
+    Serial.print(F(" : SIDH = "));
+    printByteWithLeadingZeroes(filter(f, SIDH));
+    Serial.print(F(" SIDL = "));
+    printByteWithLeadingZeroes(filter(f, SIDL));
+    Serial.print(F(" EID8 = "));
+    printByteWithLeadingZeroes(filter(f, EID8));
+    Serial.print(F(" EID0 = "));
+    printByteWithLeadingZeroes(filter(f, EID0), EOL);
+  }
+  Serial.println(F("** Buffer 1"));
+  Serial.print(mMask[1].isSet ? '+' : '-');
+  Serial.print(F("MASK : "));
+  printExtendedID(mMask[1].mask, EOL);
+  Serial.print(F(" : SIDH = "));
+  printByteWithLeadingZeroes(mask(1,SIDH));
+  Serial.print(F(" SIDL = "));
+  printByteWithLeadingZeroes(mask(1,SIDL));
+  Serial.print(F(" EID8 = "));
+  printByteWithLeadingZeroes(mask(1,EID8));
+  Serial.print(F(" EID0 = "));
+  printByteWithLeadingZeroes(mask(1,EID0), EOL);
+  for (int f = 2; f < 6; f++) {
+    Serial.print(mFilter[f].isSet ? '+' : '-');
+    Serial.print(F("FILTER "));
+    Serial.print(f);
+    Serial.print(F(" : "));
+    if (mFilter[f].isExtended) {
+      printExtendedID(mFilter[f].filter);
+    }
+    else {
+      printStandardID(mFilter[f].filter);
+    }
+    Serial.print(F(" : SIDH = "));
+    printByteWithLeadingZeroes(filter(f, SIDH));
+    Serial.print(F(" SIDL = "));
+    printByteWithLeadingZeroes(filter(f, SIDL));
+    Serial.print(F(" EID8 = "));
+    printByteWithLeadingZeroes(filter(f, EID8));
+    Serial.print(F(" EID0 = "));
+    printByteWithLeadingZeroes(filter(f, EID0), EOL);
+  }
 }
 
 // /*============================================================================
