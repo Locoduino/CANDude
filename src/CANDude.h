@@ -127,22 +127,19 @@ private:
   Filter_t mFilter[6];
 
 public:
-  enum maskOrFilterPos { SIDH = 0, SIDL = 1, EID8 = 2, EID0 = 3 };
   CANDudeFilters();
   bool setMask(const uint8_t inBuffer, const uint32_t inMask);
   bool setFilter(const uint8_t  inFilterNum,
                  const bool     inIsExtended,
                  const uint32_t inFilter);
-  uint8_t mask(const uint8_t inBuffer, const maskOrFilterPos inPos);
-  uint8_t filter(const uint8_t         inFilter,
-                 const maskOrFilterPos inPos);
+  bool mask(const uint8_t inBuffer, uint8_t * const outMask);
+  bool filter(const uint8_t inFilter, uint8_t * const outFilter);
   bool isConfigured(const uint8_t inBuffer);
   void finalize();
   void print();
+
 private:
-  bool byteInMaskOrFilter(const uint32_t        inMaskOrFilter,
-                          const maskOrFilterPos inPos,
-                          uint8_t&              result);
+  void maskOrFilter(uint32_t inMaskOrFilter, uint8_t * const outMF);
 };
 
 /*-------------------------------------------------------------------------------------------------
@@ -377,7 +374,9 @@ public:
 	/*
 	 * Start the Can bus
 	 */
-	CANDudeResult begin(const CANDudeSettings & inSettings);
+	CANDudeResult begin(
+    const CANDudeSettings & inSettings,
+    CANDudeFilters & inFilters);
 
 	/*
 	 * Send a message

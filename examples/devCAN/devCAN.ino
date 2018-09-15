@@ -22,7 +22,7 @@ void setup() {
   filters.print();
 
   /* Démarre le controlleur CAN */
-  if (controller.begin(CANDudeSettings(mcp2515::CRYSTAL_16MHZ, 250000)) == CANDudeOk) {
+  if (controller.begin(CANDudeSettings(mcp2515::CRYSTAL_16MHZ, 250000), filters) == CANDudeOk) {
     Serial.println("Connexion Ok");
     controller.read(0, 256, buf);
     for (uint16_t low = 0 ; low < 16 ; low++) {
