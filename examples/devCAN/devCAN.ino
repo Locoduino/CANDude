@@ -6,6 +6,7 @@ CANDude controller(9);
 uint8_t buf[256];
 
 void setup() {
+  delay(5000);
   Serial.begin(115200);
   Serial.println("C'est parti");
 
@@ -15,7 +16,7 @@ void setup() {
 
   filters.setMask(0, 0x3FF);        /* Buffer 0 mask */
   filters.setFilter(0, false, 0x20);
-  filters.setMask(1, 0x1FFFFFFF);   /* Buffer 1 mask */
+  //filters.setMask(1, 0x1FFFFFFF);   /* Buffer 1 mask */
   filters.setFilter(2, true, 0x1FFFFF00);
   filters.print();
   filters.finalize();
@@ -24,19 +25,7 @@ void setup() {
   /* Démarre le controlleur CAN */
   if (controller.begin(CANDudeSettings(mcp2515::CRYSTAL_16MHZ, 250000), filters) == CANDudeOk) {
     Serial.println("Connexion Ok");
-    controller.read(0, 256, buf);
-    for (uint16_t low = 0 ; low < 16 ; low++) {
-      for (uint16_t high = 0; high < 8 ; high++) {
-        uint16_t i = high << 4 | low ;
-        for (uint8_t b = 7; b > 0; b--) {
-          if ((buf[i] & (1 << b)) == 0) Serial.print('0');
-         else break;
-        }
-        Serial.print(buf[i], BIN);
-        Serial.print(' ');
-      }
-      Serial.println();
-    }
+    controller.dumpRegisters();
   }
   else {
     Serial.println("Echec");

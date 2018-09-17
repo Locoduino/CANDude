@@ -258,8 +258,7 @@ uint16_t CANDudeSettings::samplePoint() const
 CANDudeFilters::CANDudeFilters()
 {
   for (uint8_t m = 0; m < 2; m++) {
-    mMask[m].isSet = false;
-    mMask[m].mask = 0UL;
+    mMask[m] = 0UL;
   }
   for (uint8_t f = 0; f < 6; f++) {
     mFilter[f].isSet = false;
@@ -273,13 +272,11 @@ CANDudeFilters::CANDudeFilters()
  */
 bool CANDudeFilters::setMask(const uint8_t inBuffer, const uint32_t inMask)
 {
-  bool status = true;
   if (inBuffer < 2) {
-    mMask[inBuffer].isSet = true;
-    mMask[inBuffer].mask = inMask;
+    mMask[inBuffer] = inMask;
+    return true;
   }
-  else status = false;
-  return status;
+  return false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -289,14 +286,13 @@ bool CANDudeFilters::setFilter(const uint8_t  inFilterNum,
                                const bool     inIsExtended,
                                const uint32_t inFilter)
 {
-  bool status = true;
   if (inFilterNum < 6) {
     mFilter[inFilterNum].isSet = true;
     mFilter[inFilterNum].isExtended = inIsExtended;
     mFilter[inFilterNum].filter = inFilter;
+    return true;
   }
-  else status = false;
-  return status;
+  return false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -311,12 +307,12 @@ void CANDudeFilters::maskOrFilter(
   uint32_t inMaskOrFilter,
   uint8_t * const outMF) const
 {
-      outMF[0] = (uint8_t) ((inMaskOrFilter >> 3) & 0xFF);
-      outMF[1] = (uint8_t) (((inMaskOrFilter & mcp2515::RXFnSIDL_SID_MASK)
-                                             << mcp2515::RXFnSIDL_SID_SHIFT) |
-                 ((inMaskOrFilter >> 27) & 0x03));
-      outMF[2] = (uint8_t) ((inMaskOrFilter >> 19) & 0xFF);
-      outMF[3] = (uint8_t) ((inMaskOrFilter >> 11) & 0xFF);
+  outMF[0] = (uint8_t) ((inMaskOrFilter >> 3) & 0xFF);
+  outMF[1] = (uint8_t) (((inMaskOrFilter & mcp2515::RXFnSIDL_SID_MASK)
+                       << mcp2515::RXFnSIDL_SID_SHIFT) |
+                       ((inMaskOrFilter >> 27) & 0x03));
+  outMF[2] = (uint8_t) ((inMaskOrFilter >> 19) & 0xFF);
+  outMF[3] = (uint8_t) ((inMaskOrFilter >> 11) & 0xFF);
 }
 
 /*-----------------------------------------------------------------------------
@@ -327,23 +323,16 @@ bool CANDudeFilters::mask(
   const uint8_t inBuffer,
   uint8_t * const outMask) const
 {
-  if (inBuffer < 2 && mMask[inBuffer].isSet) {
-    maskOrFilter(mMask[inBuffer].mask, outMask);
+  if (inBuffer < 2) {
+    maskOrFilter(mMask[inBuffer], outMask);
     return true;
   }
-  else return false;
+  return false;
 }
 
 /*-----------------------------------------------------------------------------
- * Returns one of the 4 MCP2515 registers value for a filter.
- * inPos should be one of the following:
- * CANDudeFilters::SIDH
- * CANDudeFilters::SIDL
- * CANDudeFilters::EID8
- * CANDudeFilters::EID0
- *
- * Returns all significant bits filled with 1 if inBuffer or inPos
- * is out of range
+ * Put the 4 values for a filter in a table pointed to by outFilter.
+ * Return true if filters are correctly set, false otherwise
  */
 bool CANDudeFilters::filter(
   const uint8_t inFilter,
@@ -358,13 +347,36 @@ bool CANDudeFilters::filter(
 }
 
 /*-----------------------------------------------------------------------------
- * Check at least one mask and filter are configured for a message buffers
+ * Put the 4 values of all the filters of a buffer in a table pointed to by
+ * outFilter. 2 x 4 = 8 bytes for buffer 0 and 4 x 4 = 16 bytes for buffer 1
+ * Return true if filters are correctly set, false otherwise
+ */
+bool CANDudeFilters::filtersOfBuffer(
+  const uint8_t inBuffer,
+  uint8_t * const outFilters) const
+{
+  bool status = true;
+
+  if ((inBuffer & 0xFE) == 0) { /* 0 or 1 */
+    for (uint8_t f = inBuffer * 2, loc = 0; f < inBuffer * 4 + 2; f++, loc += 4) {
+      if (mFilter[f].isSet) {
+        maskOrFilter(mFilter[f].filter, outFilters + loc);
+        if (mFilter[f].isExtended) outFilters[loc + 1] |= mcp2515::RXFnSIDL_EXIDE;
+      }
+      else status = false;
+    }
+  }
+  return status;
+}
+
+/*-----------------------------------------------------------------------------
+ * Check all filters of mask != 0 are configured for a message buffers
  */
 bool CANDudeFilters::isConfigured(const uint8_t inBuffer) const
 {
   bool status = false;
   if (inBuffer < 2) {
-    if (mMask[inBuffer].isSet) {
+    if (mMask[inBuffer] != 0) {
       uint8_t startFilterNum = (inBuffer == 0) ? 0 : 2;
       uint8_t endFilterNum = (inBuffer == 0) ? 2 : 6;
       for (uint8_t f = startFilterNum; f < endFilterNum; f++) {
@@ -374,6 +386,7 @@ bool CANDudeFilters::isConfigured(const uint8_t inBuffer) const
         }
       }
     }
+    else status = true; /* mask is 0, so filters are not taken into account */
   }
   return status;
 }
@@ -382,15 +395,16 @@ bool CANDudeFilters::isConfigured(const uint8_t inBuffer) const
  * Compute the unset filters if mask is set and at least one filter is set
  * copy the set filter to the unset filters.
  */
-void CANDudeFilters::finalize()
+bool CANDudeFilters::finalize()
 {
   for (uint8_t m = 0; m < 2; m++) {
-    if (mMask[m].isSet) {
+    if (mMask[m] != 0) {
       uint8_t startFilterNum = (m == 0) ? 0 : 2;
       uint8_t endFilterNum = (m == 0) ? 2 : 6;
       /* search for a filter that is set */
       for (uint8_t f = startFilterNum; f < endFilterNum; f++) {
         if (mFilter[f].isSet) {
+          /* copy it to all unset filters */
           for (uint8_t ff = startFilterNum; ff < endFilterNum; ff++) {
             if (!mFilter[ff].isSet) {
               mFilter[ff] = mFilter[f];
@@ -411,9 +425,8 @@ void CANDudeFilters::print() const
   uint8_t data[4];
 
   Serial.println(F("** Buffer 0"));
-  Serial.print(mMask[0].isSet ? '+' : '-');
   Serial.print(F("MASK : "));
-  printExtendedID(mMask[0].mask);
+  printExtendedID(mMask[0]);
   if (mask(0, data)) {
     Serial.print(F(" : SIDH = "));
     printByteWithLeadingZeroes(data[0]);
@@ -449,10 +462,9 @@ void CANDudeFilters::print() const
     else Serial.println();
   }
   Serial.println(F("** Buffer 1"));
-  Serial.print(mMask[1].isSet ? '+' : '-');
   Serial.print(F("MASK : "));
-  printExtendedID(mMask[1].mask, EOL);
-  if (mask(0, data)) {
+  printExtendedID(mMask[1]);
+  if (mask(1, data)) {
     Serial.print(F(" : SIDH = "));
     printByteWithLeadingZeroes(data[0]);
     Serial.print(F(" SIDL = "));
@@ -491,30 +503,37 @@ void CANDudeFilters::print() const
 /*-----------------------------------------------------------------------------
  * Load the filter configuration in the controller
  */
-void CANDudeFilters::loadInController(CANDude * inController) const
+void CANDudeFilters::loadInController(CANDude * inController)
 {
   uint8_t successCount = 0;
-  uint8_t filterOrMask[4];
+  uint8_t filterOrMask[16];
   /* Complete the filters that have not been set */
   finalize();
-  /* Check the configuration for buffer 0 is set */
-  if (isConfigured(0)) {
-    /* Configuration ok, load the filters for buffer 0 and set the RXM bits
-     * of RXB0CTRL register so that the filters are used */
-    if (mask(0, filterOrMask)) {
-      inController.write(mcp2515::RXM0SIDH, 4, filterOrMask);
-      successCount++;
-    }
-    if (filter(0, filterOrMask)) {
-      inController.write(mcp2515::RXF0SIDH, 4, filterOrMask);
-      successCount++;
-    }
-    if (filter(1, filterOrMask)) {
-      inController.write(mcp2515::RXF1SIDH, 4, filterOrMask);
-      successCount++;
-    }
 
+  /*
+   * Load the filters for buffer 0 and set the RXM bits of RXB0CTRL register
+   * so that the filters are used
+   */
+  if (mask(0, filterOrMask)) {
+    inController->write(mcp2515::RXM0SIDH, 4, filterOrMask);
   }
+  if (filtersOfBuffer(0, filterOrMask)) {
+    inController->write(mcp2515::RXF0SIDH, 8, filterOrMask);
+  }
+  inController->modifyBit(mcp2515::RXB0CTRL, mcp2515::RXB0CTRL_RXM_MASK, 0);
+
+  /*
+   * Load the filters for buffer 1 and set the RXM bits of RXB1CTRL register
+   * so that the filters are used
+   */
+  if (mask(1, filterOrMask)) {
+    inController->write(mcp2515::RXM1SIDH, 4, filterOrMask);
+  }
+  if (filtersOfBuffer(1, filterOrMask)) {
+    inController->write(mcp2515::RXF2SIDH, 4, filterOrMask);
+    inController->write(mcp2515::RXF3SIDH, 12, filterOrMask);
+  }
+  inController->modifyBit(mcp2515::RXB1CTRL, mcp2515::RXB1CTRL_RXM_MASK, 0);
 }
 
 // /*============================================================================
@@ -983,7 +1002,16 @@ CANDudeResult CANDude::begin(
   CANDudeResult result = setMode(mcp2515::CONFIG_MODE);
   if (result == CANDudeOk) {
     //---- Program the filters according to their configuration
+    Serial.println('*');
+    dumpRegisters();
+    Serial.println('*');
+
     inFilters.loadInController(this);
+
+    Serial.println('*');
+    dumpRegisters();
+    Serial.println('*');
+
     //---- Program bit timing according to the configuration
     uint8_t cnf[3];
     //---- CNF register ar stored in consecutive registers from CNF3 to CNF1
@@ -1023,6 +1051,26 @@ CANDudeResult CANDude::begin(
     result = setMode(mcp2515::NORMAL_MODE);
   }
   return result;
+}
+
+/*-----------------------------------------------------------------------------
+ * Print the registers of the 2515
+ */
+void CANDude::dumpRegisters()
+{
+  for (uint8_t low = 0 ; low < 16 ; low++) {
+    for (uint8_t high = 0; high < 8 ; high++) {
+      uint8_t address = high << 4 | low ;
+      uint8_t reg = read(address);
+      for (uint8_t b = 7; b > 0; b--) {
+        if ((reg & (1 << b)) == 0) Serial.print('0');
+        else break;
+      }
+      Serial.print(reg, BIN);
+      Serial.print(' ');
+    }
+    Serial.println();
+  }
 }
 
 // /*----------------------------------------------------------------------------

@@ -55,7 +55,7 @@ static const uint8_t CNF1             = 0x2A;
  *  | SJW1 | SJW0 | BRP5 | BRP4 | BRP3 | BRP2 | BRP1 | BRP0 |
  *  +------+------+------+------+------+------+------+------+
  */
- 
+
 /*
  * SJW<1:0>: Synchronization Jump Width Length bits
  * 11 : Length = 4xTQ
@@ -79,12 +79,12 @@ static const uint8_t CNF2             = 0x29;
 
 /*
  *       7       6       5         4         3         2        1        0
- *     R/W-0   R/W-0   R/W-0     R/W-0     R/W-0     R/W-0    R/W-0    R/W-0  
+ *     R/W-0   R/W-0   R/W-0     R/W-0     R/W-0     R/W-0    R/W-0    R/W-0
  *	+---------+-----+---------+---------+---------+--------+--------+--------+
  *  | BTLMODE | SAM | PHSEG12 | PHSEG11 | PHSEG10 | PRSEG2 | PRSEG1 | PRSEG0 |
  *  +---------+-----+---------+---------+---------+--------+--------+--------+
  */
- 
+
 /*
  * BTLMODE: PS2 Bit Time Length bit (bit 7)
  * 1 : Length of PS2 determined by PHSEG22:PHSEG20 bits of CNF3
@@ -119,12 +119,12 @@ static const uint8_t CNF3             = 0x28;
 
 /*
  *     7       6      5     4     3       2         1         0
- *   R/W-0   R/W-0   U-0   U-0   U-0    R/W-0     R/W-0     R/W-0  
+ *   R/W-0   R/W-0   U-0   U-0   U-0    R/W-0     R/W-0     R/W-0
  *	+-----+--------+-----+-----+-----+---------+---------+---------+
  *  | SOF | WAKFIL |  -  |  -  |  -  | PHSEG22 | PHSEG21 | PHSEG20 |
  *  +-----+--------+-----+-----+-----+---------+---------+---------+
  */
- 
+
 /*
  * SOF: Start-of-Frame signal bit (bit 7)
  * If CANCTRL.CLKEN = 1:
@@ -167,12 +167,12 @@ static const uint8_t EFLG              = 0x2D;
 
 /*
  *       7        6       5      4      3      2       1       0
- *     R/W-0   R/W-0     R-0    R-0    R-0    R-0     R-0     R-0  
+ *     R/W-0   R/W-0     R-0    R-0    R-0    R-0     R-0     R-0
  *	+--------+--------+------+------+------+-------+-------+-------+
  *  | RX1OVR | RX0OVR | TXB0 | TXEP | RXEP | TXWAR | RXWAR | EWARN |
  *	+--------+--------+------+------+------+-------+-------+-------+
  */
- 
+
 /*
  * RX1OVR: Receive Buffer 1 Overflow Flag bit (bit 7)
  * - Set when a valid message is received for RXB1 and CANINTF.RX1IF = 1
@@ -243,7 +243,7 @@ static const uint8_t CANINTE           = 0x2B;
  *  | MERRE | WAKIE | ERRIE | TX2IE | TX1IE | TX0IE | RX1IE | RX0IE |
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
  */
- 
+
 /*
  * MERRE: Message Error Interrupt Enable bit (bit 7)
  * 1 : Interrupt on error during message reception or transmission
@@ -451,12 +451,12 @@ static const uint8_t CANSTAT             = 0x0E;
 
 /*
  *       7         6         5      4     3       2       1     0
- *      R-1       R-0       R-0    U-0   R-0     R-0     R-0   U-0  
+ *      R-1       R-0       R-0    U-0   R-0     R-0     R-0   U-0
  *	+---------+---------+---------+---+-------+-------+-------+---+
  *  | OPMODE2 | OPMODE1 | OPMODE0 | - | ICOD2 | ICOD1 | ICOD0 | - |
  *	+---------+---------+---------+---+-------+-------+-------+---+
  */
- 
+
 /*
  * OPMOD<2:0>: Operation mode bits (bits 7 to 5)
  * 000 : Device is in the Normal Operation mode
@@ -511,7 +511,7 @@ static const uint8_t TXB2CTRL            = 0x50;
  * See page 18 of the datasheet
  *
  *    7     6      5      4       3     2     1      0
- *   U-0   R-0    R-0    R-0    R/W-0  U-0  R/W-0  R/W-0  
+ *   U-0   R-0    R-0    R-0    R/W-0  U-0  R/W-0  R/W-0
  *	+---+------+------+-------+-------+---+------+------+
  *  | - | ABTF | MLOA | TXERR | TXREQ | - | TXP1 | TXP0 |
  *	+---+------+------+-------+-------+---+------+------+
@@ -565,7 +565,7 @@ static const uint8_t TXRTSCTRL           = 0x0D;
 
 /*
  *    7   6     5       4       3        2        1        0
- *   U-0 U-0   R-x     R-x     R-x     R/W-0    R/W-0    R/W-0  
+ *   U-0 U-0   R-x     R-x     R-x     R/W-0    R/W-0    R/W-0
  *	+---+---+-------+-------+-------+--------+--------+--------+
  *  | - | - | B2RTS | B1RTS | B0RTS | B2RTSM | B1RTSM | B0RTSM |
  *	+---+---+-------+-------+-------+--------+--------+--------+
@@ -635,7 +635,7 @@ static const uint8_t TXB2SIDH            = 0x51;
  * See page 20 of the datasheet
  *
  *      7       6      5      4      3      2      1      0
- *    R/W-x   R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x 
+ *    R/W-x   R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x
  *	+-------+------+------+------+------+------+------+------+
  *  | SID10 | SID9 | SID8 | SID7 | SID6 | SID5 | SID4 | SID3 |
  *	+-------+------+------+------+------+------+------+------+
@@ -660,7 +660,7 @@ static const uint8_t TXB2SIDL            = 0x52;
  * See page 20 of the datasheet
  *
  *      7      6      5     4      3      2      1       0
- *    R/W-x  R/W-x  R/W-x R/W-x  R/W-x  R/W-x  R/W-x   R/W-x 
+ *    R/W-x  R/W-x  R/W-x R/W-x  R/W-x  R/W-x  R/W-x   R/W-x
  *	+------+------+------+-----+-------+-----+-------+-------+
  *  | SID2 | SID1 | SID0 |  -  | EXIDE |  -  | EID17 | EID16 |
  *	+------+------+------+-----+-------+-----+-------+-------+
@@ -703,7 +703,7 @@ static const uint8_t TXB2EID8            = 0x53;
  * See page 21 of the datasheet
  *
  *      7       6       5       4       3       2       1      0
- *    R/W-x   R/W-x   R/W-x   R/W-x   R/W-x   R/W-x   R/W-x  R/W-x 
+ *    R/W-x   R/W-x   R/W-x   R/W-x   R/W-x   R/W-x   R/W-x  R/W-x
  *	+-------+-------+-------+-------+-------+-------+------+------+
  *  | EID15 | EID14 | EID13 | EID12 | EID11 | EID10 | EID9 | EID8 |
  *	+-------+-------+-------+-------+-------+-------+------+------+
@@ -728,7 +728,7 @@ static const uint8_t TXB2EID0            = 0x54;
  * See page 21 of the datasheet
  *
  *      7      6      5      4      3      2      1      0
- *    R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x 
+ *    R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x
  *	+------+------+------+------+------+------+------+------+
  *  | EID7 | EID6 | EID5 | EID4 | EID3 | EID2 | EID1 | EID0 |
  *	+------+------+------+------+------+------+------+------+
@@ -753,7 +753,7 @@ static const uint8_t TXB2DLC             = 0x55;
  * See page 22 of the datasheet
  *
  *     7     6     5     4      3      2      1      0
- *   R/W-x R/W-x R/W-x R/W-x  R/W-x  R/W-x  R/W-x  R/W-x 
+ *   R/W-x R/W-x R/W-x R/W-x  R/W-x  R/W-x  R/W-x  R/W-x
  *	+-----+-----+-----+-----+------+------+------+------+
  *  |  -  | RTR |  -  |  -  | DLC3 | DLC2 | DLC1 | DLC0 |
  *	+-----+-----+-----+-----+------+------+------+------+
@@ -820,7 +820,7 @@ static const uint8_t RXB0CTRL         = 0x60;
 
 /*
  *     7      6      5     4      3       2      1        0
- *    U-0   R/W-0  R/W-0  U-0    R-0    R/W-0   R-0      R-0 
+ *    U-0   R/W-0  R/W-0  U-0    R-0    R/W-0   R-0      R-0
  *	+-----+------+------+-----+-------+------+-------+---------+
  *  |  -  | RXM1 | RXM0 |  -  | RXRTR | BUKT | BUKT1 | FILHIT0 |
  *	+-----+------+------+-----+-------+------+-------+---------+
@@ -841,6 +841,7 @@ static const uint8_t RXB0CTRL         = 0x60;
  */
 static const uint8_t RXB0CTRL_RXM1    = 1 << 6;
 static const uint8_t RXB0CTRL_RXM0    = 1 << 5;
+static const uint8_t RXB0CTRL_RXM_MASK = RXB0CTRL_RXM1 | RXB0CTRL_RXM0;
 
 /*
  * RXRTR: Received Remote Transfer Request bit (bit 3)
@@ -879,7 +880,7 @@ static const uint8_t RXB1CTRL         = 0x70;
 
 /*
  *     7      6      5     4      3        2         1         0
- *    U-0   R/W-0  R/W-0  U-0    R-0      R-0       R-0       R-0 
+ *    U-0   R/W-0  R/W-0  U-0    R-0      R-0       R-0       R-0
  *	+-----+------+------+-----+-------+---------+---------+---------+
  *  |  -  | RXM1 | RXM0 |  -  | RXRTR | FILHIT2 | FILHIT1 | FILHIT0 |
  *	+-----+------+------+-----+-------+---------+---------+---------+
@@ -900,6 +901,7 @@ static const uint8_t RXB1CTRL         = 0x70;
  */
 static const uint8_t RXB1CTRL_RXM1    = 1 << 6;
 static const uint8_t RXB1CTRL_RXM0    = 1 << 5;
+static const uint8_t RXB1CTRL_RXM_MASK = RXB1CTRL_RXM1 | RXB1CTRL_RXM0;
 
 /*
  * RXRTR: Received Remote Transfer Request bit (bit 3)
@@ -930,7 +932,7 @@ static const uint8_t BFPCTRL          = 0x0C;
 
 /*
  *     7     6      5       4       3       2       1       0
- *    U-0   U-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0 
+ *    U-0   U-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0
  *	+-----+-----+-------+-------+-------+-------+-------+-------+
  *  |  -  |  -  | B1BFS | B0BFS | B1BFE | B0BFE | B1BFM | B0BFM |
  *	+-----+-----+-------+-------+-------+-------+-------+-------+
@@ -994,7 +996,7 @@ static const uint8_t RXB1SIDH         = 0x71;
  * See page 30 of the datasheet
  *
  *      7       6      5      4      3      2      1      0
- *     R-x     R-x    R-x    R-x    R-x    R-x    R-x    R-x  
+ *     R-x     R-x    R-x    R-x    R-x    R-x    R-x    R-x
  *	+-------+------+------+------+------+------+------+------+
  *  | SID10 | SID9 | SID8 | SID7 | SID6 | SID5 | SID4 | SID3 |
  *	+-------+------+------+------+------+------+------+------+
@@ -1014,7 +1016,7 @@ static const uint8_t RXB1SIDL         = 0x72;
  * See page 30 of the datasheet
  *
  *      7      6      5     4     3     2      1       0
- *     R-x    R-x    R-x   R-x   R-x   U-0    R-x     R-x  
+ *     R-x    R-x    R-x   R-x   R-x   U-0    R-x     R-x
  *	+------+------+------+-----+-----+-----+-------+-------+
  *  | SID2 | SID1 | SID0 | SRR | IDE |  -  | EID17 | EID16 |
  *	+------+------+------+-----+-----+-----+-------+-------+
@@ -1072,7 +1074,7 @@ static const uint8_t RXB1EID8         = 0x73;
  * See page 31 of the datasheet
  *
  *      7       6       5       4       3       2       1      0
- *     R-x     R-x     R-x     R-x     R-x     R-x     R-x    R-x 
+ *     R-x     R-x     R-x     R-x     R-x     R-x     R-x    R-x
  *	+-------+-------+-------+-------+-------+-------+------+------+
  *  | EID15 | EID14 | EID13 | EID12 | EID11 | EID10 | EID9 | EID8 |
  *	+-------+-------+-------+-------+-------+-------+------+------+
@@ -1179,7 +1181,7 @@ static const uint8_t RXF5SIDH         = 0x18;
  * See page 35 of the datasheet
  *
  *      7       6      5      4      3      2      1      0
- *    R/W-x   R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  
+ *    R/W-x   R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x  R/W-x
  *	+-------+------+------+------+------+------+------+------+
  *  | SID10 | SID9 | SID8 | SID7 | SID6 | SID5 | SID4 | SID3 |
  *	+-------+------+------+------+------+------+------+------+
@@ -1200,7 +1202,7 @@ static const uint8_t RXF5SIDL         = 0x19;
  * See page 35 of the datasheet
  *
  *      7      6      5     4      3      2      1       0
- *    R/W-x  R/W-x  R/W-x  U-0   R/W-x   U-0   R/W-x   R/W-x 
+ *    R/W-x  R/W-x  R/W-x  U-0   R/W-x   U-0   R/W-x   R/W-x
  *	+------+------+------+-----+-------+-----+-------+-------+
  *  | SID2 | SID1 | SID0 |  -  | EXIDE |  -  | EID17 | EID16 |
  *	+------+------+------+-----+-------+-----+-------+-------+
@@ -1243,7 +1245,7 @@ static const uint8_t RXF5EID8            = 0x1A;
  * See page 36 of the datasheet
  *
  *      7       6       5       4       3       2       1      0
- *    R/W-x   R/W-x   R/W-x   R/W-x   R/W-x   R/W-x   R/W-x  R/W-x  
+ *    R/W-x   R/W-x   R/W-x   R/W-x   R/W-x   R/W-x   R/W-x  R/W-x
  *	+-------+-------+-------+-------+-------+-------+------+------+
  *  | EID15 | EID14 | EID13 | EID12 | EID11 | EID10 | EID9 | EID8 |
  *	+-------+-------+-------+-------+-------+-------+------+------+
@@ -1280,7 +1282,7 @@ static const uint8_t RXM1SIDH            = 0x24;
  * See page 37 of the datasheet
  *
  *      7       6      5      4      3      2      1      0
- *    R/W-0   R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  
+ *    R/W-0   R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0
  *	+-------+------+------+------+------+------+------+------+
  *  | SID10 | SID9 | SID8 | SID7 | SID6 | SID5 | SID4 | SID3 |
  *	+-------+------+------+------+------+------+------+------+
@@ -1296,7 +1298,7 @@ static const uint8_t RXM1SIDL            = 0x25;
  * See page 37 of the datasheet
  *
  *      7      6      5     4     3     2      1       0
- *    R/W-0  R/W-0  R/W-0  U-0   U-0   U-0   R/W-0   R/W-0 
+ *    R/W-0  R/W-0  R/W-0  U-0   U-0   U-0   R/W-0   R/W-0
  *	+------+------+------+-----+-----+-----+-------+-------+
  *  | SID2 | SID1 | SID0 |  -  |  -  |  -  | EID17 | EID16 |
  *	+------+------+------+-----+-----+-----+-------+-------+
@@ -1312,7 +1314,7 @@ static const uint8_t RXM1EID8            = 0x26;
  * See page 38 of the datasheet
  *
  *      7       6       5       4       3       2       1      0
- *    R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0  R/W-0 
+ *    R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0   R/W-0  R/W-0
  *	+-------+-------+-------+-------+-------+-------+------+------+
  *  | EID15 | EID14 | EID13 | EID12 | EID11 | EID10 | EID9 | EID8 |
  *	+-------+-------+-------+-------+-------+-------+------+------+
@@ -1328,7 +1330,7 @@ static const uint8_t RXM1EID0            = 0x27;
  * See page 38 of the datasheet
  *
  *      7      6      5      4      3      2      1      0
- *    R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0 
+ *    R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0  R/W-0
  *  +------+------+------+------+------+------+------+------+
  *  | EID7 | EID6 | EID5 | EID4 | EID3 | EID2 | EID1 | EID0 |
  *	+------+------+------+------+------+------+------+------+

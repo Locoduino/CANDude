@@ -120,10 +120,7 @@ private:
     uint32_t filter : 30;
   } Filter_t;
 
-  typedef struct {
-    bool     isSet : 1;
-    uint32_t mask : 31;
-  } Mask_t;
+  typedef uint32_t Mask_t;
 
   Mask_t   mMask[2];
   Filter_t mFilter[6];
@@ -136,10 +133,11 @@ public:
                  const uint32_t inFilter);
   bool mask(const uint8_t inBuffer, uint8_t * const outMask) const;
   bool filter(const uint8_t inFilter, uint8_t * const outFilter) const;
+  bool filtersOfBuffer(const uint8_t inBuffer, uint8_t * const outFilters) const;
   bool isConfigured(const uint8_t inBuffer) const;
-  void finalize();
+  bool finalize();
   void print() const;
-  void loadInController(CANDude * inController) const;
+  void loadInController(CANDude * inController);
 
 private:
   void maskOrFilter(uint32_t inMaskOrFilter, uint8_t * const outMF) const;
@@ -170,6 +168,7 @@ typedef enum {
   CANDudeOk,
   CANDudeSPIFailed,
   CANDudeBadConfig,
+  CANDudeBadFilterConfig,
   CANDudeBadMode,
   CANDudeSetModeTimeout,
 	CANDudeOutOfMemory,
@@ -381,6 +380,10 @@ public:
     const CANDudeSettings & inSettings,
     CANDudeFilters & inFilters);
 
+  /*
+   * Print the registers of the 2515
+   */
+  void dumpRegisters();
 	/*
 	 * Send a message
 	 */
