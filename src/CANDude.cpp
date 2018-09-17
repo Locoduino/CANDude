@@ -65,7 +65,12 @@ static void printStandardID(
 
 static const bool EOL = true;
 
-/*----------------------------------------------------------------------------
+/*=============================================================================
+ * CANDudeSettings Class
+ *
+ * Settings of the CAN controller. An instance of this class is passed to them
+ * constructor of the CAN controller.
+ *-----------------------------------------------------------------------------
  * Constructor. Does computation of bit timing
  */
 CANDudeSettings::CANDudeSettings(const uint32_t inCANCrystal,
@@ -241,9 +246,14 @@ uint16_t CANDudeSettings::samplePoint() const
   return divisor > 0 ? (1000 * (divisor - phaseSeg2)) / divisor : 0;
 }
 
-
-/*-------------------------------------------------------------------------------------------------
- * Constructor. Initialize the masks and the filters so that no message is accepted
+/*=============================================================================
+ * CANDudeFilters Class
+ *
+ * It manages a set of filters. An instance of this class is passed to the
+ * constructor of the controller.
+ *-----------------------------------------------------------------------------
+ * Constructor.
+ * Initialize the masks and the filters so that no message is accepted
  */
 CANDudeFilters::CANDudeFilters()
 {
@@ -299,7 +309,7 @@ bool CANDudeFilters::setFilter(const uint8_t  inFilterNum,
  */
 void CANDudeFilters::maskOrFilter(
   uint32_t inMaskOrFilter,
-  uint8_t * const outMF)
+  uint8_t * const outMF) const
 {
       outMF[0] = (uint8_t) ((inMaskOrFilter >> 3) & 0xFF);
       outMF[1] = (uint8_t) (((inMaskOrFilter & mcp2515::RXFnSIDL_SID_MASK)
@@ -313,7 +323,9 @@ void CANDudeFilters::maskOrFilter(
  * Put MCP2515 registers values for a mask in table pointed by outMask
  * and returns true. Returns false if inBuffer or inPos is out of range
  */
-bool CANDudeFilters::mask(const uint8_t inBuffer, uint8_t * const outMask)
+bool CANDudeFilters::mask(
+  const uint8_t inBuffer,
+  uint8_t * const outMask) const
 {
   if (inBuffer < 2 && mMask[inBuffer].isSet) {
     maskOrFilter(mMask[inBuffer].mask, outMask);
@@ -335,7 +347,7 @@ bool CANDudeFilters::mask(const uint8_t inBuffer, uint8_t * const outMask)
  */
 bool CANDudeFilters::filter(
   const uint8_t inFilter,
-  uint8_t * const outFilter)
+  uint8_t * const outFilter) const
 {
   if (inFilter < 6 && mFilter[inFilter].isSet) {
     maskOrFilter(mFilter[inFilter].filter, outFilter);
@@ -348,7 +360,7 @@ bool CANDudeFilters::filter(
 /*-----------------------------------------------------------------------------
  * Check at least one mask and filter are configured for a message buffers
  */
-bool CANDudeFilters::isConfigured(const uint8_t inBuffer)
+bool CANDudeFilters::isConfigured(const uint8_t inBuffer) const
 {
   bool status = false;
   if (inBuffer < 2) {
@@ -392,9 +404,9 @@ void CANDudeFilters::finalize()
 }
 
 /*-----------------------------------------------------------------------------
- * print the filter inSettings
+ * print the filter settings
  */
-void CANDudeFilters::print()
+void CANDudeFilters::print() const
 {
   uint8_t data[4];
 
@@ -473,6 +485,35 @@ void CANDudeFilters::print()
       printByteWithLeadingZeroes(data[3], EOL);
     }
     else Serial.println();
+  }
+}
+
+/*-----------------------------------------------------------------------------
+ * Load the filter configuration in the controller
+ */
+void CANDudeFilters::loadInController(CANDude * inController) const
+{
+  uint8_t successCount = 0;
+  uint8_t filterOrMask[4];
+  /* Complete the filters that have not been set */
+  finalize();
+  /* Check the configuration for buffer 0 is set */
+  if (isConfigured(0)) {
+    /* Configuration ok, load the filters for buffer 0 and set the RXM bits
+     * of RXB0CTRL register so that the filters are used */
+    if (mask(0, filterOrMask)) {
+      inController.write(mcp2515::RXM0SIDH, 4, filterOrMask);
+      successCount++;
+    }
+    if (filter(0, filterOrMask)) {
+      inController.write(mcp2515::RXF0SIDH, 4, filterOrMask);
+      successCount++;
+    }
+    if (filter(1, filterOrMask)) {
+      inController.write(mcp2515::RXF1SIDH, 4, filterOrMask);
+      successCount++;
+    }
+
   }
 }
 
@@ -941,6 +982,8 @@ CANDudeResult CANDude::begin(
   //---- Enter config mode
   CANDudeResult result = setMode(mcp2515::CONFIG_MODE);
   if (result == CANDudeOk) {
+    //---- Program the filters according to their configuration
+    inFilters.loadInController(this);
     //---- Program bit timing according to the configuration
     uint8_t cnf[3];
     //---- CNF register ar stored in consecutive registers from CNF3 to CNF1

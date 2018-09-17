@@ -26,6 +26,8 @@
 #include <Arduino.h>
 #include <MCP2515Definitions.h>
 
+class CANDude;
+
 /*=================================================================================================
  * CANDudeSettings class handles a setting of the CAN bus
  *
@@ -98,7 +100,7 @@ public:
   /*
    * timeQuantaCount returns the number of time quantum (TQ) in a bit
    */
-  public : uint8_t timeQuantaCount()const;
+  public : uint8_t timeQuantaCount() const;
 
   /*
    * print the configuration for debug purpose
@@ -132,14 +134,15 @@ public:
   bool setFilter(const uint8_t  inFilterNum,
                  const bool     inIsExtended,
                  const uint32_t inFilter);
-  bool mask(const uint8_t inBuffer, uint8_t * const outMask);
-  bool filter(const uint8_t inFilter, uint8_t * const outFilter);
-  bool isConfigured(const uint8_t inBuffer);
+  bool mask(const uint8_t inBuffer, uint8_t * const outMask) const;
+  bool filter(const uint8_t inFilter, uint8_t * const outFilter) const;
+  bool isConfigured(const uint8_t inBuffer) const;
   void finalize();
-  void print();
+  void print() const;
+  void loadInController(CANDude * inController) const;
 
 private:
-  void maskOrFilter(uint32_t inMaskOrFilter, uint8_t * const outMF);
+  void maskOrFilter(uint32_t inMaskOrFilter, uint8_t * const outMF) const;
 };
 
 /*-------------------------------------------------------------------------------------------------
