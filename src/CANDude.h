@@ -1,6 +1,6 @@
-/*=================================================================================================
+/*=============================================================================
  * CANDude.h
- *-------------------------------------------------------------------------------------------------
+ *-----------------------------------------------------------------------------
  * Classes to manage a MCP 2515 Can controller
  *
  * LOCODUINO, http://www.locoduino.org
@@ -28,7 +28,7 @@
 
 class CANDude;
 
-/*=================================================================================================
+/*=============================================================================
  * CANDudeSettings class handles a setting of the CAN bus
  *
  * Initialization of CANDude starts with the instantiation of a CANDudeSettings
@@ -42,16 +42,25 @@ class CANDude;
 class CANDudeSettings
 {
 private:
-  uint32_t  mWishedBaudRate;  /* Wished baud rate in bits/s as specified in the constructor       */
-  uint32_t  mCANCrystal;      /* Frequency in Hertz of the MCP2515 crystal                        */
-  bool      mConfigOk;        /* At start mConfigOk is set to false.
-                                 If the configuration is doable, it is set to true                */
-  uint8_t   mBRP;             /* Baud Rate Prescaler. Ranges from 0 to 63. Actual Value is mBRP+1 */
-  uint8_t   mPS;              /* Propagation Segment. Ranges from 0 to 7. Actual value is mPS+1   */
-  uint8_t   mPS1;             /* Phase Segment 1. Ranges from 0 to 7. Actual value is mPS1+1      */
-  uint8_t   mPS2;             /* Phase Segment 2. Ranges from 1 to 7. Actual value is mPS2+1      */
-  uint8_t   mSJW;             /* Sync Jump Width. Ranges from 0 to 3. Actual value is mSJW+1      */
-  bool      mTripleSampling;  /* Triple sampling                                                  */
+  /* Wished baud rate in bits/s as specified in the constructor              */
+  uint32_t  mWishedBaudRate;
+  /* Frequency in Hertz of the MCP2515 crystal                               */
+  uint32_t  mCANCrystal;
+  /* At start mConfigOk is set to false. If the configuration is doable,
+     it is set to true                                                       */
+  bool      mConfigOk;
+  /* Baud Rate Prescaler. Ranges from 0 to 63. Actual Value is mBRP+1        */
+  uint8_t   mBRP;
+  /* Propagation Segment. Ranges from 0 to 7. Actual value is mPS+1          */
+  uint8_t   mPS;
+  /* Phase Segment 1. Ranges from 0 to 7. Actual value is mPS1+1             */
+  uint8_t   mPS1;
+  /* Phase Segment 2. Ranges from 1 to 7. Actual value is mPS2+1             */
+  uint8_t   mPS2;
+  /* Sync Jump Width. Ranges from 0 to 3. Actual value is mSJW+1             */
+  uint8_t   mSJW;
+  /* Triple sampling                                                         */
+  bool      mTripleSampling;
 
 public:
   /*
@@ -93,7 +102,8 @@ public:
   public : uint16_t samplePoint() const;
 
   /*
-   * PPMError returns the relative baud rate error expressed in parts per million
+   * PPMError returns the relative baud rate error
+   * expressed in parts per million
    */
   public : uint32_t PPMError() const;
 
@@ -108,7 +118,7 @@ public:
   public : void print() const;
 };
 
-/*=================================================================================================
+/*=============================================================================
  * CANDudeFilters class handles the filters and the masks
  */
 class CANDudeFilters {
@@ -126,15 +136,56 @@ private:
   Filter_t mFilter[6];
 
 public:
+  /*
+   * Constructor. Init both masks to 0 and all filters to unset.
+   */
   CANDudeFilters();
+
+  /*
+   * Set the mask of a buffer
+   * inBuffer is the id of the buffer (0 or 1), inMask is the mask to set.
+   * Return true if successful (inBuffer in range), false otherwise.
+   */
   bool setMask(const uint8_t inBuffer, const uint32_t inMask);
+
+  /*
+   * Set a filter. inFilterNum is the id of the filter (from 0 to 5),
+   * inIsExtended is true if the filter id for extended frames, false if the
+   * filter is for standard frames. inFilter is the filter value.
+   * Return true if successful (inFilterNum in range), false otherwise.
+   */
   bool setFilter(const uint8_t  inFilterNum,
                  const bool     inIsExtended,
                  const uint32_t inFilter);
+
+  /*
+   * Get the mask corresponding to a buffer as an array of 4 bytes encoded
+   * as expected by the MCP2515. inBuffer is the id of the buffer (0 or 1),
+   * outMask is a pointer to an array of at least 4 bytes.
+   * Return true if inBuffer is in range 0-1, false otherwise.
+   */
   bool mask(const uint8_t inBuffer, uint8_t * const outMask) const;
+
+  /*
+   * Get a filter as an array of 4 bytes encoded as expected by the MCP2515
+   * inFilter is the id of the filter (0 to 5), outFilter is a pointer to
+   * an array of at least 4 bytes.
+   * Return true if successful (inFilter is range and the filter has been set),
+    * false otherwise.
+   */
   bool filter(const uint8_t inFilter, uint8_t * const outFilter) const;
+
+  /*
+   * Get all filters corresponding to a buffer as an array of the number of
+   * filters x 4 bytes encoded as expected by the MCP2515.
+   * inBuffer is the id of the buffer (0 or 1), outFilters is a pointer to
+   * an array of at least 8 bytes if inBuffer is 0 and 16 bytes if inBuffer
+   * is 1.
+   * Return true if successful (inBuffer is range and the filters have been
+   * set), false otherwise.
+   */
   bool filtersOfBuffer(const uint8_t inBuffer, uint8_t * const outFilters) const;
-  bool isConfigured(const uint8_t inBuffer) const;
+
   bool finalize();
   void print() const;
   void loadInController(CANDude * inController);
@@ -143,12 +194,12 @@ private:
   void maskOrFilter(uint32_t inMaskOrFilter, uint8_t * const outMF) const;
 };
 
-/*-------------------------------------------------------------------------------------------------
+/*-----------------------------------------------------------------------------
  * function pointer for interrupt handlers
  */
 typedef  void (*CANDudeInterrupt)();
 
-// /*-------------------------------------------------------------------------------------------------
+// /*-----------------------------------------------------------------------------
 //  * Macro to intantiante a controller as long as its interrupt handler
 //  * and links them together.
 //  * _controller is the name of the controller object
@@ -173,7 +224,9 @@ typedef enum {
   CANDudeSetModeTimeout,
 	CANDudeOutOfMemory,
 	CANDudeNoRoom,
-	CANDudeWrongInterruptPin
+	CANDudeWrongInterruptPin,
+  CANDudeOutOfRange,
+  CANDudeControllerNotStarted
 } CANDudeResult ;
 
 class CANDude;
@@ -229,13 +282,13 @@ class CANDude;
 //   public : void print() const;
 // };
 
-/*-------------------------------------------------------------------------------------------------
+/*-----------------------------------------------------------------------------
  * CANDude is the base class to talk with a MCP2515
  */
 class CANDude
 {
 private:
-  uint8_t           mSlaveSelectPin;
+  uint8_t mSlaveSelectPin;
 
 protected:
   void select()   { digitalWrite(mSlaveSelectPin, LOW);  }
@@ -248,7 +301,7 @@ protected:
 
 public:
 
-  // Constructor, init the slave select pin and the interrupt pin
+  // Constructor, init the slave select pin
   CANDude(const uint8_t inSlaveSelectPin);
 
   // Reset the MCP2515 by sending a reset command
@@ -272,7 +325,9 @@ public:
 	 * buffer is a pointer to where the read value will be stored.
 	 * Size of the storage should be at least numberOfRegisters.
 	 */
-	void read(const uint8_t inStartAddress, uint16_t inNumberOfRegisters, uint8_t *outBuffer);
+	void read(const uint8_t inStartAddress,
+            uint16_t inNumberOfRegisters,
+            uint8_t *outBuffer);
 
 	/*
 	 * Read a RX buffer without the header of the message by
@@ -283,7 +338,9 @@ public:
 	 * buffer is a pointer to where the message will be stored.
 	 * Size of the storage should be at least numberOfuint8_t
 	 */
-	void readRawMessage(const uint8_t inBufferID, uint8_t inNumberOfBytes, uint8_t *outBuffer);
+	void readRawMessage(const uint8_t inBufferID,
+                      uint8_t inNumberOfBytes,
+                      uint8_t *outBuffer);
 
 	/*
 	 * Write registers in sequential order by sending a WRITE command.
@@ -292,19 +349,25 @@ public:
 	 * buffer is a pointer from where the value to write will be stored.
 	 * Size of the storage should be at least numberOfRegisters.
 	 */
-	void write(const uint8_t inStartAddress, uint16_t inNumberOfRegisters, uint8_t *inBuffer);
+	void write(const uint8_t inStartAddress,
+             uint16_t inNumberOfRegisters,
+             uint8_t *inBuffer);
 
 	/*
-	 * Load a TX buffer without the header of the message by
+	 * Load a TX buffer with the header of the message by
 	 * sending a LOAD TX BUFFER command.
-	 * bufferId is the identifier of the TX buffer.
+	 * inBufferId is the identifier of the TX buffer.
 	 * It can be mcp2515::TX_BUFFER_0, mcp2515::TX_BUFFER_1 or
 	 * mcp2515::TX_BUFFER_2.
-	 * numberOfbytes is the number of bytes to write to the message.
-	 * buffer is a pointer from where the message will be read.
+	 * inHeader is a pointer to a 4 bytes buffer containing the identifier
+   * inBuffer is a pointer from where the message will be read.
+   * inNumberOfbytes is the number of bytes to write to the message.
 	 * Size of the buffer should be at least numberOfbytes
 	 */
-	void loadMessage(const uint8_t inBufferID, uint8_t * inBuffer, uint8_t inNumberOfBytes);
+	void loadMessage(const uint8_t inBufferID,
+                   uint8_t *inHeader,
+                   const uint8_t inDLC,
+                   uint8_t *inBuffer = NULL);
 
 	/*
 	 * Request to send one or more TX buffer(s)
@@ -357,7 +420,9 @@ public:
 	 * data is the bits to set or reset according to the mask.
 	 * basically: reg <- (reg & ~mask) | (data & mask)
 	 */
-	void modifyBit(const uint8_t inAddress, const uint8_t inMask, const uint8_t inData);
+	void modifyBit(const uint8_t inAddress,
+                 const uint8_t inMask,
+                 const uint8_t inData);
 
 	/*
 	 * setMode method.
@@ -376,9 +441,8 @@ public:
 	/*
 	 * Start the Can bus
 	 */
-	CANDudeResult begin(
-    const CANDudeSettings & inSettings,
-    CANDudeFilters & inFilters);
+	CANDudeResult begin(const CANDudeSettings & inSettings,
+                      CANDudeFilters & inFilters);
 
   /*
    * Print the registers of the 2515
@@ -395,63 +459,45 @@ public:
 	void handleInterrupt();
 };
 
-/*----------------------------------------------------------------------------
- * CanController add interaction with messages
- */
-// class CanController : protected CANDude
-// {
-//   private:
-//     CanReceiveMessage *mReceiveMessages;
-//     CanSendMessage    *mSendMessages;
-//     uint8_t              *mBuffer;
-//     CanSendMessage    *lastMessageForTXBuffer[3];
-//
-//   public:
-//     CanController(const uint8_t slaveSelectPin) :
-//       CANDude(slaveSelectPin),
-//       mReceiveMessages(NULL),
-//       mSendMessagesCount(0)
-//     {
-//       mBuffer = new uint8_t[8];
-//     }
-//
-//     /*
-//      * Read a RX buffer with the header of the message by
-//      * sending a READ RX BUFFER command.
-//      * bufferID is the identifier of the RX buffer.
-//      * It can be mcp2515::RX_BUFFER_0 or mcp2515::RX_BUFFER_1.
-//      */
-//     void readMessage(const uint8_t bufferID);
-//
-//     /*
-//      * Load a TX buffer with the header of the message by
-//      * sending a LOAD TX BUFFER command.
-//      * bufferID is the identifier of the TX buffer.
-//      * It can be mcp2515::TX_BUFFER_0, mcp2515::TX_BUFFER_1 or
-//      * mcp2515::TX_BUFFER_2.
-//      * message is a pointer to a CanSendSync message
-//      */
-//     void loadMessage(const uint8_t bufferID, CanSendsync *message);
-//
-//     /*
-//      * Load a TX buffer with the header of the message by
-//      * sending a LOAD TX BUFFER command.
-//      * bufferID is the identifier of the TX buffer.
-//      * It can be mcp2515::TX_BUFFER_0, mcp2515::TX_BUFFER_1 or
-//      * mcp2515::TX_BUFFER_2.
-//      * message is a pointer to a CanSendData message
-//      */
-//     void loadMessage(const uint8_t bufferID, CanSendData *message);
-//
-//     /*
-//      *
-//      */
-//     void computeTXBufferAttribution();
-//
-//     /*
-//      *
-//      */
-//     void addReceiveMessage(CanReceiveMessage *message);
-// };
+class CANDudeController;
+
+class AbstractCANSendMessage
+{
+protected:
+  uint8_t mSidh;  /* bits 10-3 of standard identifier                       */
+  uint8_t mSidl;  /* bits 2-0 of sid, EXIDE and bits 17 and 16 of eid       */
+  uint8_t mEid8;  /* bits 15-8 of extended identifier                       */
+  uint8_t mEid0;  /* bits 7-0 od extended identifiers                       */
+  CANDudeController *mController; /* A pointer to the CAN controller object */
+public:
+  AbstractCANSendMessage(CANDudeController * const inController);
+  CANDudeResult setStandardId(const uint16_t inId);
+  uint16_t standardId() const;
+  CANDudeResult setExtendedId(const uint32_t inId);
+  uint16_t extendedId() const;
+  CANDudeResult setTransmitBuffer(const uint8_t inBuffer);
+  uint8_t transmitBuffer() const;
+  virtual CANDudeResult send(const uint8_t *inData, const uint8_t inLength) = 0;
+};
+
+class CANDudeController : public CANDude
+{
+public:
+  CANDudeController(const uint8_t inSlaveSelectPin) :
+    CANDude(inSlaveSelectPin)
+  {}
+  CANDudeResult sendMessage(const AbstractCANSendMessage *inMessage,
+                            const uint8_t *inData,
+                            const uint8_t inLength);
+};
+
+class CANSendMessage : public AbstractCANSendMessage
+{
+public:
+  CANSendMessage(CANDudeController * const inController) :
+    AbstractCANSendMessage(inController) {}
+  virtual CANDudeResult send(const uint8_t *inData,
+                             const uint8_t inLength);
+};
 
 #endif

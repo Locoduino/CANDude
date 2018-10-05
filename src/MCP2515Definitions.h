@@ -640,6 +640,7 @@ static const uint8_t TXB2SIDH            = 0x51;
  *  | SID10 | SID9 | SID8 | SID7 | SID6 | SID5 | SID4 | SID3 |
  *	+-------+------+------+------+------+------+------+------+
  */
+static const uint8_t TXBnSIDH_SID_SHIFT  = 3;
 
 /*----------------------------------------------------------------------------
  * TXB0SIDL – TRANSMIT BUFFER 0 STANDARD IDENTIFIER LOW (ADDRESS: 32h)
@@ -683,6 +684,16 @@ static const uint8_t TXBnSIDL_EXIDE      = 1 << 3;
  * EID<17:16>: Extended Identifier bits (bits 1 and 0)
  */
 static const uint8_t TXBnSIDL_EID_MASK   = 0x03;
+
+/*
+ * Mask to isolate the unused bits
+ */
+static const uint8_t TXBnSIDL_UNUSED_SHIFT_1 = 4;
+static const uint8_t TXBnSIDL_UNUSED_SHIFT_2 = 2;
+static const uint8_t TXBnSIDL_UNUSED_MASK_1 = (1 << TXBnSIDL_UNUSED_SHIFT_1);
+static const uint8_t TXBnSIDL_UNUSED_MASK_2 = (1 << TXBnSIDL_UNUSED_SHIFT_2);
+static const uint8_t TXBnSIDL_UNUSED_MASK = TXBnSIDL_UNUSED_MASK_1 |
+                                            TXBnSIDL_UNUSED_MASK_2;
 
 /*----------------------------------------------------------------------------
  * TXB0EID8 – TRANSMIT BUFFER 0 EXTENDED IDENTIFIER HIGH (ADDRESS: 33h)
@@ -1378,6 +1389,12 @@ static inline uint8_t __attribute__((always_inline, unused)) LOAD_TX_BUFFER(
   uint8_t idAsInteger)
 {
   return (LOAD_TX_BUFFER_NO_ID | (idAsInteger << 1));
+}
+
+static inline uint8_t __attribute__((always_inline, unused)) LOAD_TX_BUFFER_WITHOUT_ID(
+  uint8_t idAsInteger)
+{
+  return (LOAD_TX_BUFFER_NO_ID | (idAsInteger << 1) | 0x01);
 }
 
 /*----------------------------------------------------------------------------

@@ -27,43 +27,50 @@
 
 static const uint32_t kMaxBaudRateForTripleSampling = 125000;
 
-static void printByteWithLeadingZeroes(
-  const uint8_t inValue,
-  const bool    inNewline = false)
+static void printByteWithLeadingZeroes(const uint8_t inValue)
 {
   uint8_t mask = B10000000;
   while (mask != 0) {
     Serial.print((mask & inValue) != 0);
     mask >>= 1;
   }
-  if (inNewline) Serial.println();
 }
 
-static void printExtendedID(
-  const uint32_t inValue,
-  const bool     inNewline = false)
+static inline void printByteWithLeadingZeroesLn(const uint8_t inValue)
+{
+  printByteWithLeadingZeroes(inValue);
+  Serial.println();
+}
+
+static void printExtendedID(const uint32_t inValue)
 {
   uint32_t mask = 0x10000000;
   while (mask != 0) {
     Serial.print((mask & inValue) != 0);
     mask >>= 1;
   }
-  if (inNewline) Serial.println();
 }
 
-static void printStandardID(
-  const uint32_t inValue,
-  const bool     inNewline = false)
+static inline void printExtendedIDLn(const uint32_t inValue)
+{
+  printExtendedID(inValue);
+  Serial.println();
+}
+
+static void printStandardID(const uint32_t inValue)
 {
   uint32_t mask = 0x00000400;
   while (mask != 0) {
     Serial.print((mask & inValue) != 0);
     mask >>= 1;
   }
-  if (inNewline) Serial.println();
 }
 
-static const bool EOL = true;
+static inline void printStandardIDLn(const uint32_t inValue)
+{
+  printStandardID(inValue);
+  Serial.println();
+}
 
 /*=============================================================================
  * CANDudeSettings Class
@@ -262,8 +269,6 @@ CANDudeFilters::CANDudeFilters()
   }
   for (uint8_t f = 0; f < 6; f++) {
     mFilter[f].isSet = false;
-    mFilter[f].isExtended = false;
-    mFilter[f].filter = 0UL;
   }
 }
 
@@ -357,7 +362,7 @@ bool CANDudeFilters::filtersOfBuffer(
 {
   bool status = true;
 
-  if ((inBuffer & 0xFE) == 0) { /* 0 or 1 */
+  if (inBuffer < 2) {
     for (uint8_t f = inBuffer * 2, loc = 0; f < inBuffer * 4 + 2; f++, loc += 4) {
       if (mFilter[f].isSet) {
         maskOrFilter(mFilter[f].filter, outFilters + loc);
@@ -370,51 +375,36 @@ bool CANDudeFilters::filtersOfBuffer(
 }
 
 /*-----------------------------------------------------------------------------
- * Check all filters of mask != 0 are configured for a message buffers
+ * Compute the unset filters if mask is set and at least one filter is set
+ * copy the set filter to the unset filters.
+ *
+ * Returns true if :
+ * - mask is 0 or
+ * - mask is not 0 and a least one filter is set
  */
-bool CANDudeFilters::isConfigured(const uint8_t inBuffer) const
+bool CANDudeFilters::finalize()
 {
   bool status = false;
-  if (inBuffer < 2) {
-    if (mMask[inBuffer] != 0) {
-      uint8_t startFilterNum = (inBuffer == 0) ? 0 : 2;
-      uint8_t endFilterNum = (inBuffer == 0) ? 2 : 6;
-      for (uint8_t f = startFilterNum; f < endFilterNum; f++) {
+  for (uint8_t m = 0; m < 2; m++) {
+    if (mMask[m] != 0) {
+      /* search for a filter that is set */
+      for (uint8_t f = m * 2; f < m * 4 + 2; f++) {
         if (mFilter[f].isSet) {
+          /* copy it to all unset filters */
+          for (uint8_t ff = m * 2; ff < m * 4 + 2; ff++) {
+            if (!mFilter[ff].isSet) {
+              mFilter[ff] = mFilter[f];
+            }
+          }
+          /* At least one filter is set and has been replicated */
           status = true;
           break;
         }
       }
     }
-    else status = true; /* mask is 0, so filters are not taken into account */
+    else status = true;
   }
   return status;
-}
-
-/*-----------------------------------------------------------------------------
- * Compute the unset filters if mask is set and at least one filter is set
- * copy the set filter to the unset filters.
- */
-bool CANDudeFilters::finalize()
-{
-  for (uint8_t m = 0; m < 2; m++) {
-    if (mMask[m] != 0) {
-      uint8_t startFilterNum = (m == 0) ? 0 : 2;
-      uint8_t endFilterNum = (m == 0) ? 2 : 6;
-      /* search for a filter that is set */
-      for (uint8_t f = startFilterNum; f < endFilterNum; f++) {
-        if (mFilter[f].isSet) {
-          /* copy it to all unset filters */
-          for (uint8_t ff = startFilterNum; ff < endFilterNum; ff++) {
-            if (!mFilter[ff].isSet) {
-              mFilter[ff] = mFilter[f];
-            }
-          }
-          break;
-        }
-      }
-    }
-  }
 }
 
 /*-----------------------------------------------------------------------------
@@ -435,7 +425,7 @@ void CANDudeFilters::print() const
     Serial.print(F(" EID8 = "));
     printByteWithLeadingZeroes(data[2]);
     Serial.print(F(" EID0 = "));
-    printByteWithLeadingZeroes(data[3], EOL);
+    printByteWithLeadingZeroesLn(data[3]);
   }
   else Serial.println();
   for (int f = 0; f < 2; f++) {
@@ -457,7 +447,7 @@ void CANDudeFilters::print() const
       Serial.print(F(" EID8 = "));
       printByteWithLeadingZeroes(data[2]);
       Serial.print(F(" EID0 = "));
-      printByteWithLeadingZeroes(data[3], EOL);
+      printByteWithLeadingZeroesLn(data[3]);
     }
     else Serial.println();
   }
@@ -472,7 +462,7 @@ void CANDudeFilters::print() const
     Serial.print(F(" EID8 = "));
     printByteWithLeadingZeroes(data[2]);
     Serial.print(F(" EID0 = "));
-    printByteWithLeadingZeroes(data[3], EOL);
+    printByteWithLeadingZeroesLn(data[3]);
   }
   else Serial.println();
   for (int f = 2; f < 6; f++) {
@@ -494,7 +484,7 @@ void CANDudeFilters::print() const
       Serial.print(F(" EID8 = "));
       printByteWithLeadingZeroes(data[2]);
       Serial.print(F(" EID0 = "));
-      printByteWithLeadingZeroes(data[3], EOL);
+      printByteWithLeadingZeroesLn(data[3]);
     }
     else Serial.println();
   }
@@ -505,8 +495,8 @@ void CANDudeFilters::print() const
  */
 void CANDudeFilters::loadInController(CANDude * inController)
 {
-  uint8_t successCount = 0;
   uint8_t filterOrMask[16];
+
   /* Complete the filters that have not been set */
   finalize();
 
@@ -859,31 +849,39 @@ void CANDude::readRawMessage(
 }
 
 /*----------------------------------------------------------------------------
- * Load a TX buffer without the header of the message by
+ * Load a TX buffer with the header of the message by
  * sending a LOAD TX BUFFER command.
- * bufferId is the identifier of the TX buffer.
+ * inBufferId is the identifier of the TX buffer.
  * It can be mcp2515::TX_BUFFER_0, mcp2515::TX_BUFFER_1 or
  * mcp2515::TX_BUFFER_2.
- * inNumberOfBytes is the number of uint8_ts to write to the message.
- * buffer is a pointer from where the message will be read.
- * Size of the buffer should be at least inNumberOfBytes
+ * inHeader is a pointer to a 4 bytes buffer containing the identifier
+ * inBuffer is a pointer from where the message will be read.
+ * inNumberOfbytes is the number of bytes to write to the message.
+ * Size of the buffer should be at least numberOfbytes
  */
 void CANDude::loadMessage(
   const uint8_t inBufferID,
-  uint8_t *     inBuffer,
-  uint8_t       inNumberOfBytes)
+  uint8_t *inHeader,
+  const uint8_t inDLC,
+  uint8_t *inBuffer)
 {
-  Serial.print("S: ");
-  Serial.print(mcp2515::LOAD_TX_BUFFER(inBufferID), BIN);
-  for (uint8_t i = 0; i < inNumberOfBytes; i++) {
-    Serial.print(' ');
-    Serial.print(inBuffer[i], BIN);
-  }
-  Serial.println();
+  const uint8_t dataLength = inDLC & 0x0F;
+  const bool anyData = ((inDLC & mcp2515::TXBnDLC_RTR) != 0) && (dataLength > 0);
+
+  // Serial.print("S: ");
+  // Serial.print(mcp2515::LOAD_TX_BUFFER(inBufferID), BIN);
+  // for (uint8_t i = 0; i < inNumberOfBytes; i++) {
+  //   Serial.print(' ');
+  //   Serial.print(inBuffer[i], BIN);
+  // }
+  // Serial.println();
+
   SPIBeginTransaction();
   select();
   SPI.transfer(mcp2515::LOAD_TX_BUFFER(inBufferID));
-  while (inNumberOfBytes--) SPI.transfer(*inBuffer++);
+  SPI.transfer(inHeader, 4);
+  SPI.transfer(inDLC);
+  if (anyData) SPI.transfer(inBuffer, dataLength);
   unselect();
   SPIEndTransaction();
 }
@@ -1073,194 +1071,84 @@ void CANDude::dumpRegisters()
   }
 }
 
-// /*----------------------------------------------------------------------------
-//  * Send a message
-//  */
-// CANDudeResult CANDude::sendMessage(const CANDudeSendMessage & inMessage)
-// {
-//   if (mSendCount > 0) {
-//     if (mSendQueue->available() >= inMessage.sizeInBytes()) {
-//       mSendQueue->pushByte(inMessage.start(), 5);
-//       mSendQueue->pushByte(inMessage.dataPart(), inMessage.length());
-//       return CANDudeOk;
-//     }
-//     else {
-//       return CANDudeNoRoom;
-//     }
-//   }
-//   else {
-//     loadMessage(0, inMessage);
-//   }
-// }
 
-// /*----------------------------------------------------------------------------
-//  * Handle the MCP2515 interrupt
-//  */
-// void CANDude::handleInterrupt()
-// {
-// }
+CANDudeResult CANDudeController::sendMessage(
+  const AbstractCANSendMessage *inMessage,
+  const uint8_t *inData,
+  const uint8_t inLength)
+{
+  loadMessage(inMessage->transmitBuffer(), );
+}
 
-// /*----------------------------------------------------------------------------
-//  * Read a RX buffer with the header of the message by
-//  * sending a READ RX BUFFER command.
-//  * bufferID is the identifier of the RX buffer.
-//  * It can be mcp2515::RX_BUFFER_0 or mcp2515::RX_BUFFER_1.
-//  * The message is dispatched to the CanReceiveMessage having the corresponding
-//  * identifier or discarded.
-//  */
-// void CanController::readMessage(const uint8_t bufferID)
-// {
-//   select();
-//   SPI.transfer(mcp2515::READ_RX_BUFFER | bufferID | mcp2515::RX_BUFFER_ID);
-//   uint8_t sidh = SPI.transfer(0);
-//   uint8_t sidl = SPI.transfer(0);
-//   uint8_t eid8 = SPI.transfer(0);
-//   uint8_t eid0 = SPI.transfer(0);
-//   uint8_t dlc  = SPI.transfer(0);
-//   uint8_t size = dlc & mcp2515::RXBnDLC_DLC_MASK;
-//   for (uint8_t i = 0; i < size; i++) buffer[i] = SPI.transfer(0);
-//   unselect();
-//
-//   /* standard id part */
-//   long frameId = sidh;
-//   frameId = (frameId << 3)  | (sidl >> 5);
-//
-//   /* look for the kind of message, standard or extended */
-//   if (sidl & mcp2515::RXBnSIDL_IDE) {
-//     /* extended frame, add the extended id part */
-//     frameId = (frameId << 2)  | (sidl & 0x03);
-//     frameId = (frameId << 8)  | eid8;
-//     frameId = (frameId << 8)  | eid0;
-//     /* mark the frame as extended by setting the sign bit */
-//     frameId |= 0x80000000;
-//   }
-//
-//   /* look for the destination message */
-//   CanReceiveMessage *destinationMessage;
-//   if (destinationMessage = findReceiveMessage(frameId)) {
-//     buffer = destinationMessage.set(size, buffer);
-//   }
-// }
-//
-// /*----------------------------------------------------------------------------
-//  * Load a TX buffer with the header of the message by
-//  * sending a LOAD TX BUFFER command.
-//  * bufferID is the identifier of the TX buffer.
-//  * It can be mcp2515::TX_BUFFER_0, mcp2515::TX_BUFFER_1 or
-//  * mcp2515::TX_BUFFER_2.
-//  * message is a pointer to a CanSendSync message
-//  */
-// void CanController::loadMessage(const uint8_t bufferID, CanSendsync *message)
-// {
-//   if (lastMessageForTXBuffer[bufferID] != message) {
-//     /* The header have to be loaded */
-//     select();
-//     SPI.transfer(mcp2515::LOAD_TX_BUFFER(bufferID));
-//     unsigned long identifier = message->identifier();
-//     if (identifier & 0x80000000) {
-//       /* extended message, the sidh is bits 28 to 21 */
-//       SPI.transfer(uint8_t((identifier >> 21) & 0xFF));
-//       /* the sidl is bits 20 to 18 and 17 to 16 */
-//       SPI.transfer(uint8_t(
-//         ((identifier >> 13) & (TXBnSIDL_SID_MASK << TXBnSIDL_SID_SHIFT)) |
-//         TXBnSIDL_EXIDE |
-//         ((identifier >> 16) & TXBnSIDL_EID_MASK)
-//       ));
-//       /* extended high */
-//       SPI.transfer(uint8_t((identifier >> 8) & 0xFF));
-//       /* extended low */
-//       SPI.transfer(uint8_t(identifier & 0xFF));
-//     }
-//     else {
-//       /* extended message, the sidh is bits 10 to 3 */
-//       SPI.transfer(uint8_t((identifier >> 3) & 0xFF));
-//       /* the sidl is bits 2 to 0 */
-//       SPI.transfer(
-//         uint8_t((identifier & TXBnSIDL_SID_MASK) << TXBnSIDL_SID_SHIFT)
-//       );
-//       /* extended unused */
-//       SPI.transfer(0);
-//       SPI.transfer(0);
-//     }
-//     /* Data length is 0 */
-//     SPI.transfer(0);
-//     unselect();
-//   }
-//   /* request to send of the TX buffer */
-//   requestToSend(1 << bufferID);
-// }
-//
-// /*----------------------------------------------------------------------------
-//  */
-// void CanController::computeTXBufferAttribution()
-// {
-//   /* remaining messages to attribute is set to the number of messages */
-//   uint8_t remainingMessagesToAttribute = 0;
-//   CanSendMessage *currentMessage = mSendMessages;
-//   while (currentMessage != NULL) {
-//     remainingMessagesToAttribute++;
-//     currentMessage = currentMessage->nextMessage();
-//   }
-//
-//   /* compute the number of messages per TX buffer */
-//   uint8_t TXBufferId = 0;
-//   uint8_t TXBufferMessageCount[3] = { 0, 0, 0 };
-//   /* This is done by ++ the number of messages using a round-robin scheme */
-//   while (remainingMessagesToAttribute > 0) {
-//     TXBufferMessageCount[TXBufferId]++;
-//     TXBufferId = (TXBufferId + 1) % 3;
-//   }
-//
-//   /* set the TX buffer ID for each message */
-//   currentMessage = mSendMessages;
-//   TXBufferId = 0;
-//   while (currentMessage != NULL) {
-//     if (TXBufferMessageCount[TXBufferId] == 0) TXBufferId++;
-//     currentMessage->setTXBufferId(TXBufferId);
-//     currentMessage = currentMessage->next();
-//     TXBufferMessageCount[TXBufferId]--;
-//   }
-// }
-//
-// /*----------------------------------------------------------------------------
-//  */
-// void CanController::addReceiveMessage(CanReceiveMessage *message)
-// {
-//   message->setNext(mReceiveMessages);
-//   mReceiveMessages = message;
-// }
-//
-// /*----------------------------------------------------------------------------
-//  * Add a sending message to the controller. Messages are sorted according
-//  * to their priority
-//  */
-// void CanController::addSendMessage(CanSendMessage *message)
-// {
-//   if (message != NULL) {
-//     message->setController(this);
-//     mSendMessages = mSendMessages->addMessage(message);
-//   }
-// }
-//
-// /*----------------------------------------------------------------------------
-//  */
-// void CanController::begin()
-// {
-//   CanReceiveMessage *message = mReceiveMessages;
-//   while (message != NULL) {
-//
-//     message = message->nextMessage();
-//   }
-// }
-//
-// /*----------------------------------------------------------------------------
-//  */
-// CanReceiveMessage *CanController::findReceiveMessage(unsigned long id)
-// {
-//   CanReceiveMessage *message = mReceiveMessages;
-//   while (message != NULL) {
-//     if (message->accept(id)) break;
-//     message = message->nextMessage();
-//   }
-//   return message;
-// }
+AbstractCANSendMessage::AbstractCANSendMessage(
+  CANDudeController * const inController) :
+mSidh(0),
+mSidl(0),
+mEid8(0),
+mEid0(0),
+mController(inController)
+{
+}
+
+/*
+ * Set the standard Id of the send message. As a result the frame
+ * is a standard one.
+ */
+CANDudeResult AbstractCANSendMessage::setStandardId(const uint16_t inId)
+{
+  mSidh = (inId >> mcp2515::TXBnSIDH_SID_SHIFT) & 0xFF;
+  /* while setting the SIDL, preserve the unused bits which contain the buffer */
+  mSidl = ((inId & mcp2515::TXBnSIDL_SID_MASK) << mcp2515::TXBnSIDL_SID_SHIFT)
+            | (mSidl & mcp2515::TXBnSIDL_UNUSED_MASK);
+  /* EXIDE bit is set to 0, so that the frame is a standard one */
+  return (inId & ~((1UL << 11) - 1)) ? CANDudeOutOfRange : CANDudeOk;
+}
+
+/*
+ * Set the standard Id of the send message. As a result the frame
+ * is an extended one.
+ */
+CANDudeResult AbstractCANSendMessage::setExtendedId(const uint32_t inId)
+{
+  setStandardId((uint16_t)inId);
+  mSidl |= mcp2515::TXBnSIDL_EXIDE; /* it's and extended id */
+  mSidl |= (inId >> 27) & mcp2515::TXBnSIDL_EID_MASK;
+  mEid8 = (inId >> 19) & 0xFF;
+  mEid0 = (inId >> 11) & 0xFF;
+  return (inId & ~((1UL << 29) - 1)) ? CANDudeOutOfRange : CANDudeOk;
+}
+
+/*
+ * Set the transmit buffer the message uses. inBuffer can range from 0 to 3
+ * When 0 to 2, it is the transmit buffers
+ * When 3, it means any buffer.
+ * For sake of memory footprint unused 2 bits in SIDL are used to set
+ * the buffer for the message.
+ */
+CANDudeResult AbstractCANSendMessage::setTransmitBuffer(const uint8_t inBuffer)
+{
+  mSidl &= ~mcp2515::TXBnSIDL_UNUSED_MASK;
+  mSidl |= (inBuffer & 0x2) << (mcp2515::TXBnSIDL_UNUSED_SHIFT_1 - 1);
+  mSidl |= (inBuffer & 0x1) << mcp2515::TXBnSIDL_UNUSED_SHIFT_2;
+  return (inBuffer & ~0x03) ? CANDudeOutOfRange : CANDudeOk;
+}
+
+uint8_t AbstractCANSendMessage::transmitBuffer() const
+{
+  return ((mSidl & mcp2515::TXBnSIDL_UNUSED_MASK_1) >>
+            (mcp2515::TXBnSIDL_UNUSED_SHIFT_1 - 1)) |
+         ((mSidl & mcp2515::TXBnSIDL_UNUSED_MASK_2) >>
+            mcp2515::TXBnSIDL_UNUSED_SHIFT_2);
+}
+
+/*
+ * Send a data message.
+ * Arguments are:
+ * - inData: a pointer to a byte array containing the bytes to send
+ * - inLength: the number of bytes
+ */
+CANDudeResult CANSendMessage::send(const uint8_t *inData,
+                                   const uint8_t inLength)
+{
+  return mController->sendMessage(this, inData, inLength);
+}
